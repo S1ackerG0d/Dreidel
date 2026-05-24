@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dreidel — LAN Party</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>🕎 Dreidel</h1>
+      <p id="connection" class="status">Connecting…</p>
+    </header>
+
+    <!-- Join screen -->
+    <section id="join-screen" class="card hidden">
+      <h2>Join the game</h2>
+      <div class="field">
+        <input id="name-input" type="text" placeholder="Your name" maxlength="20" autocomplete="off" />
+        <button id="join-btn">Join</button>
+      </div>
+      <p id="join-error" class="error"></p>
+    </section>
+
+    <!-- Lobby -->
+    <section id="lobby-screen" class="card hidden">
+      <h2>Lobby</h2>
+      <div id="lobby-host-controls" class="hidden">
+        <div class="field">
+          <label for="tokens-input">Starting gelt per player:</label>
+          <input id="tokens-input" type="number" min="2" max="50" value="10" />
+        </div>
+        <button id="start-btn">Start game</button>
+        <p class="hint">Waiting for at least 2 players.</p>
+      </div>
+      <p id="lobby-wait" class="hint hidden">Waiting for the host to start the game…</p>
+      <ul id="lobby-players" class="player-list"></ul>
+    </section>
+
+    <!-- Game -->
+    <section id="game-screen" class="hidden">
+      <div class="card pot-card">
+        <div class="pot">
+          <span class="pot-label">Pot</span>
+          <span id="pot-value" class="pot-value">0</span>
+        </div>
+        <div id="dreidel" class="dreidel">
+          <span id="dreidel-letter">🪀</span>
+        </div>
+        <div id="spin-result" class="spin-result"></div>
+        <button id="spin-btn" class="spin-btn hidden">Spin the dreidel!</button>
+        <p id="turn-info" class="turn-info"></p>
+      </div>
+
+      <div class="card">
+        <h2>Players</h2>
+        <ul id="game-players" class="player-list"></ul>
+      </div>
+
+      <div id="gameover" class="card hidden">
+        <h2 id="winner-text"></h2>
+        <button id="newgame-btn" class="hidden">Play again</button>
+      </div>
+
+      <div class="card">
+        <h2>Game log</h2>
+        <ul id="log" class="log"></ul>
+      </div>
+    </section>
+
+    <footer>
+      <p class="legend">
+        <strong>נ Nun</strong> nothing ·
+        <strong>ג Gimel</strong> take all ·
+        <strong>ה Hey</strong> take half ·
+        <strong>ש Shin</strong> add one
+      </p>
+    </footer>
+  </div>
+
+  <script src="/client.js"></script>
+</body>
+</html>

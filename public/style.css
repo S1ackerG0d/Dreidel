@@ -1,0 +1,170 @@
+:root {
+  --bg: #0e1330;
+  --card: #1b2150;
+  --accent: #f5c542;
+  --accent-2: #4f7cff;
+  --text: #eef1ff;
+  --muted: #9aa3d4;
+  --danger: #ff6b6b;
+  --ok: #54d18c;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: radial-gradient(circle at 50% -10%, #243089, var(--bg) 60%);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+#app {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 1.2rem 1rem 3rem;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+header h1 {
+  font-size: 2.4rem;
+  margin: 0.2rem 0;
+}
+
+.status {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 0;
+}
+.status.online { color: var(--ok); }
+.status.offline { color: var(--danger); }
+
+.card {
+  background: var(--card);
+  border-radius: 16px;
+  padding: 1.2rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+}
+
+h2 { margin-top: 0; }
+
+.hidden { display: none !important; }
+
+.field {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 0.6rem;
+}
+
+input[type="text"], input[type="number"] {
+  flex: 1;
+  min-width: 120px;
+  padding: 0.7rem 0.9rem;
+  border-radius: 10px;
+  border: 1px solid #2f3a7a;
+  background: #11173b;
+  color: var(--text);
+  font-size: 1rem;
+}
+
+label { color: var(--muted); }
+
+button {
+  padding: 0.7rem 1.3rem;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent-2);
+  color: white;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.05s ease, filter 0.15s ease;
+}
+button:hover { filter: brightness(1.1); }
+button:active { transform: translateY(1px); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.spin-btn {
+  background: var(--accent);
+  color: #2a2200;
+  font-size: 1.2rem;
+  padding: 0.9rem 2rem;
+  margin-top: 0.5rem;
+}
+
+.error { color: var(--danger); min-height: 1.2em; margin: 0.3rem 0 0; }
+.hint { color: var(--muted); font-size: 0.9rem; }
+
+.player-list { list-style: none; padding: 0; margin: 0; }
+.player-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0.8rem;
+  border-radius: 10px;
+  margin-bottom: 0.4rem;
+  background: #161c44;
+}
+.player-list li.current { outline: 2px solid var(--accent); }
+.player-list li.out { opacity: 0.45; }
+.player-list .pname { font-weight: 600; }
+.player-list .tag {
+  font-size: 0.7rem;
+  background: var(--accent-2);
+  color: white;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  margin-left: 0.4rem;
+}
+.player-list .tag.host { background: var(--accent); color: #2a2200; }
+.player-list .tag.you { background: var(--ok); color: #08200f; }
+.player-list .tag.offline { background: #555; }
+.player-list .gelt { font-variant-numeric: tabular-nums; font-weight: 700; }
+.player-list .gelt::before { content: "🪙 "; }
+
+.pot-card { text-align: center; }
+.pot { margin-bottom: 0.8rem; }
+.pot-label { display: block; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; font-size: 0.8rem; }
+.pot-value { font-size: 3rem; font-weight: 800; color: var(--accent); }
+
+.dreidel {
+  width: 130px;
+  height: 130px;
+  margin: 0.5rem auto;
+  border-radius: 20px;
+  background: linear-gradient(145deg, #3a4694, #232c66);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 4rem;
+  box-shadow: inset 0 0 20px rgba(0,0,0,0.4), 0 6px 16px rgba(0,0,0,0.4);
+}
+.dreidel.spinning { animation: spin 0.6s linear infinite; }
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin-result {
+  min-height: 1.6em;
+  font-size: 1.05rem;
+  margin: 0.5rem 0;
+}
+.turn-info { color: var(--muted); margin: 0.4rem 0 0; }
+
+.log { list-style: none; padding: 0; margin: 0; max-height: 220px; overflow-y: auto; }
+.log li { padding: 0.35rem 0; border-bottom: 1px solid #2a3266; font-size: 0.9rem; color: var(--muted); }
+.log li:last-child { border-bottom: none; }
+
+footer { text-align: center; margin-top: 1rem; }
+.legend { color: var(--muted); font-size: 0.85rem; line-height: 1.7; }
+.legend strong { color: var(--text); }
+
+#winner-text { color: var(--accent); text-align: center; }
