@@ -166,7 +166,35 @@ function randomizeBoard(topology) {
     'ore', 'ore', 'ore',
     'desert',
   ]);
-  const numbers = shuffle([5, 2, 6, 3, 8, 10, 9, 12, 11, 4, 8, 10, 9, 4, 5, 6, 3, 11]);
+  // Hex adjacency: two hexes are neighbours when they share an edge.
+  const neighbours = {};
+  for (const h of topology.hexes) neighbours[h.id] = [];
+  for (const e of topology.edges) {
+    if (e.hexes.length === 2) {
+      neighbours[e.hexes[0]].push(e.hexes[1]);
+      neighbours[e.hexes[1]].push(e.hexes[0]);
+    }
+  }
+
+  // The "red" high-probability tokens (6 & 8) may never sit on adjacent hexes,
+  // matching the official setup rule. Numbers are dealt to the non-desert hexes
+  // in board order, so reshuffle the token list until no two reds land next to
+  // each other — with only four red tokens a valid layout is found almost
+  // immediately.
+  const RED = new Set([6, 8]);
+  const numberedHexIds = topology.hexes
+    .filter((h) => resPool[topology.hexes.indexOf(h)] !== 'desert')
+    .map((h) => h.id);
+
+  let numbers;
+  for (let attempt = 0; attempt < 1000; attempt++) {
+    numbers = shuffle([5, 2, 6, 3, 8, 10, 9, 12, 11, 4, 8, 10, 9, 4, 5, 6, 3, 11]);
+    const numByHex = {};
+    numberedHexIds.forEach((id, i) => { numByHex[id] = numbers[i]; });
+    const clash = numberedHexIds.some((id) =>
+      RED.has(numByHex[id]) && neighbours[id].some((nb) => RED.has(numByHex[nb])));
+    if (!clash) break;
+  }
 
   const hexes = {};
   let robber = null;
