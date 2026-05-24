@@ -113,6 +113,7 @@ function render() {
 
   $('draw-btn').disabled = state.deckCount === 0;
   $('take-discard-btn').disabled = state.discardCount === 0;
+  $('sort-btn').disabled = !(me && me.hand && me.hand.length > 1);
 
   // Players
   $('players').innerHTML = state.players.map((p) => {
@@ -159,6 +160,7 @@ $('deal-btn').addEventListener('click', () =>
   action('deal', { count: Number($('deal-count').value) }));
 $('draw-btn').addEventListener('click', () => action('draw'));
 $('take-discard-btn').addEventListener('click', () => action('drawDiscard'));
+$('sort-btn').addEventListener('click', () => action('sortHand'));
 
 // Boot
 if (playerId) connectEvents();

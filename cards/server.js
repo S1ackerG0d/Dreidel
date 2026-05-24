@@ -18,6 +18,10 @@ const SUITS = [
 ];
 const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
+// Lookup tables for sorting a hand: suit first, then rank.
+const SUIT_ORDER = Object.fromEntries(SUITS.map((s, i) => [s.key, i]));
+const RANK_ORDER = Object.fromEntries(RANKS.map((r, i) => [r, i]));
+
 function buildDeck() {
   const deck = [];
   for (const suit of SUITS) {
@@ -202,6 +206,15 @@ function handleAction(body) {
       const [card] = p.hand.splice(idx, 1);
       game.discard.push(card);
       addLog(`${p.name} played ${card.rank}${card.symbol}.`);
+      broadcast();
+      return { status: 200, json: { ok: true } };
+    }
+
+    case 'sortHand': {
+      const p = findPlayer(body.playerId);
+      if (!p) return { status: 400, json: { error: 'Unknown player.' } };
+      p.hand.sort((a, b) =>
+        SUIT_ORDER[a.suit] - SUIT_ORDER[b.suit] || RANK_ORDER[a.rank] - RANK_ORDER[b.rank]);
       broadcast();
       return { status: 200, json: { ok: true } };
     }
