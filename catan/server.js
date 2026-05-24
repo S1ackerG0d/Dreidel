@@ -677,6 +677,30 @@ function bankTrade(playerId, give, receive) {
 }
 
 // ---------------------------------------------------------------------------
+// Sending resources to another player (a one-way gift). Negotiation happens on
+// voice chat; this just moves the cards and logs it publicly for everyone.
+// ---------------------------------------------------------------------------
+function sendResources(fromId, toId, gift) {
+  if (game.phase !== 'play') return { error: 'You can only send resources during the game.' };
+  const from = findPlayer(fromId);
+  const to = findPlayer(toId);
+  if (!to || to.id === fromId) return { error: 'Choose another player to send to.' };
+  const g = {};
+  let total = 0;
+  for (const r of RESOURCES) {
+    const n = Math.max(0, Math.floor(Number(gift && gift[r]) || 0));
+    g[r] = n;
+    total += n;
+  }
+  if (total === 0) return { error: 'Select at least one resource to send.' };
+  for (const r of RESOURCES) if (g[r] > from.resources[r]) return { error: 'You do not have those resources.' };
+  for (const r of RESOURCES) { from.resources[r] -= g[r]; to.resources[r] += g[r]; }
+  const parts = RESOURCES.filter((r) => g[r] > 0).map((r) => `${g[r]} ${r}`);
+  addLog(`${from.name} sent ${parts.join(', ')} to ${to.name}.`);
+  return {};
+}
+
+// ---------------------------------------------------------------------------
 // End of turn
 // ---------------------------------------------------------------------------
 function endTurn(playerId) {
@@ -900,6 +924,7 @@ function handleAction(body) {
     case 'buyDev': result = buyDev(playerId); break;
     case 'playDev': result = playDev(playerId, body); break;
     case 'bankTrade': result = bankTrade(playerId, body.give, body.receive); break;
+    case 'sendResources': result = sendResources(playerId, body.toId, body.gift); break;
     case 'endTurn': result = endTurn(playerId); break;
     case 'leave': {
       if (game.phase === 'lobby') {

@@ -15,6 +15,8 @@ let mode = null;            // 'road' | 'settlement' | 'city' | null
 let showTrade = false;
 let showPlenty = false;
 let showMonopoly = false;
+let showSend = false;
+let sendSel = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
 let discardSel = null;      // { wood, brick, ... }
 
 // ---------------------------------------------------------------------------
@@ -403,6 +405,29 @@ function renderPanels() {
   $('monopoly-panel').classList.toggle('hidden', !monoOpen);
   if (monoOpen && !$('monopoly-res').options.length) $('monopoly-res').innerHTML = selectOptions('wood');
 
+  // Send resources to another player — available any time during play.
+  const inPlay = state.phase === 'play';
+  $('send-toggle').classList.toggle('hidden', !inPlay);
+  const sendOpen = showSend && inPlay;
+  $('send-panel').classList.toggle('hidden', !sendOpen);
+  if (sendOpen) {
+    const others = state.players.filter((p) => p.id !== playerId);
+    const prev = $('send-to').value;
+    $('send-to').innerHTML = others.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+    if (others.some((p) => p.id === prev)) $('send-to').value = prev;
+    let total = 0;
+    $('send-controls').innerHTML = RES.map((r) => {
+      if (sendSel[r] > state.you.resources[r]) sendSel[r] = state.you.resources[r];
+      total += sendSel[r];
+      return `<div class="res-chip discard-chip"><span class="ico">${ICON[r]}</span>
+        <button data-sendd="-" data-r="${r}">−</button>
+        <span class="cnt">${sendSel[r]}/${state.you.resources[r]}</span>
+        <button data-sendd="+" data-r="${r}">+</button></div>`;
+    }).join('');
+    $('send-btn').disabled = total === 0 || others.length === 0;
+    $('send-btn').textContent = total > 0 ? `Send ${total} card${total === 1 ? '' : 's'}` : 'Send';
+  }
+
   // Steal targets shown in the status area as buttons.
   if (state.turnPhase === 'steal' && myTurn() && state.stealTargets) {
     const btns = state.stealTargets.map((t) =>
@@ -485,6 +510,21 @@ $('discard-btn').addEventListener('click', async () => {
 $('action-hint').addEventListener('click', (e) => {
   const b = e.target.closest('[data-steal]');
   if (b) act('steal', { targetId: b.getAttribute('data-steal') });
+});
+
+$('send-toggle').addEventListener('click', () => { showSend = !showSend; renderPanels(); });
+$('send-controls').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-sendd]');
+  if (!b) return;
+  const r = b.getAttribute('data-r');
+  const dir = b.getAttribute('data-sendd');
+  if (dir === '+' && sendSel[r] < state.you.resources[r]) sendSel[r]++;
+  if (dir === '-' && sendSel[r] > 0) sendSel[r]--;
+  renderPanels();
+});
+$('send-btn').addEventListener('click', async () => {
+  const r = await act('sendResources', { toId: $('send-to').value, gift: sendSel });
+  if (!r.error) { sendSel = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 }; showSend = false; renderPanels(); }
 });
 
 // Boot

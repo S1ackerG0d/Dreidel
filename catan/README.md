@@ -51,6 +51,12 @@ Share the **LAN address** with players on the same Wi-Fi. Change the port with
      matching **harbour**.
    - **End your turn.**
 
+   **Sending resources to other players:** tap **🎁 Send resources** any time
+   during the game to hand cards to another player. There's no in-app offer
+   screen — agree the deal out loud on voice chat, then each side sends their
+   half. Every transfer is written to the public log so the whole table can see
+   who gave what.
+
 ### Scoring & special cards
 
 - **Settlement** = 1 point, **City** = 2 points.
