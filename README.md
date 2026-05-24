@@ -1,3 +1,16 @@
+# 🕎 LAN Party Games
+
+Self-hosted multiplayer party games for your own Linux PC. Everyone on the same
+network joins from their phone or laptop browser — no app installs, no internet
+required, **zero dependencies**. Two games live here:
+
+- **🕎 Dreidel** — `node server.js` (port 3000) — the full dreidel game below.
+- **🃏 Card Table** — `node cards/server.js` (port 3100) — a shared 52-card deck
+  with dealing, drawing, a face-up table pile, and private hands. See
+  [`cards/README.md`](cards/README.md).
+
+---
+
 # 🕎 Dreidel — LAN Party Edition
 
 A multiplayer [dreidel](https://en.wikipedia.org/wiki/Dreidel) game you host on

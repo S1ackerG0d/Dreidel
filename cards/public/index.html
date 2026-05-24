@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Card Table — LAN</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>🃏 Card Table</h1>
+      <p id="connection" class="status">Connecting…</p>
+    </header>
+
+    <!-- Join -->
+    <section id="join-screen" class="card hidden">
+      <h2>Sit down at the table</h2>
+      <div class="field">
+        <input id="name-input" type="text" placeholder="Your name" maxlength="20" autocomplete="off" />
+        <button id="join-btn">Join</button>
+      </div>
+      <p id="join-error" class="error"></p>
+    </section>
+
+    <!-- Table -->
+    <section id="table-screen" class="hidden">
+      <div class="card piles">
+        <div class="pile">
+          <div class="card-back" id="deck-pile">🂠</div>
+          <span class="pile-label">Deck: <b id="deck-count">0</b></span>
+        </div>
+        <div class="pile">
+          <div id="discard-pile" class="playing-card empty">—</div>
+          <span class="pile-label">Table: <b id="discard-count">0</b></span>
+        </div>
+      </div>
+
+      <div id="dealer-controls" class="card hidden">
+        <h2>Dealer controls</h2>
+        <div class="field">
+          <button id="start-btn">New deck &amp; shuffle</button>
+          <button id="shuffle-btn">Shuffle deck</button>
+          <button id="recall-btn" class="secondary">Collect all &amp; reshuffle</button>
+        </div>
+        <div class="field">
+          <label for="deal-count">Deal</label>
+          <input id="deal-count" type="number" min="1" max="13" value="5" />
+          <label>card(s) to each player</label>
+          <button id="deal-btn">Deal</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="field between">
+          <h2>Your hand</h2>
+          <div>
+            <button id="draw-btn">Draw from deck</button>
+            <button id="take-discard-btn" class="secondary">Take from table</button>
+          </div>
+        </div>
+        <p class="hint">Click a card to play it onto the table.</p>
+        <div id="hand" class="hand"></div>
+      </div>
+
+      <div class="card">
+        <h2>Players</h2>
+        <ul id="players" class="player-list"></ul>
+      </div>
+
+      <div class="card">
+        <h2>Log</h2>
+        <ul id="log" class="log"></ul>
+      </div>
+    </section>
+  </div>
+  <script src="/client.js"></script>
+</body>
+</html>
