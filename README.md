@@ -2,12 +2,15 @@
 
 Self-hosted multiplayer party games for your own Linux PC. Everyone on the same
 network joins from their phone or laptop browser — no app installs, no internet
-required, **zero dependencies**. Two games live here:
+required, **zero dependencies**. Three games live here:
 
 - **🕎 Dreidel** — `node server.js` (port 3000) — the full dreidel game below.
 - **🃏 Card Table** — `node cards/server.js` (port 3100) — a shared 52-card deck
   with dealing, drawing, a face-up table pile, and private hands. See
   [`cards/README.md`](cards/README.md).
+- **Spyfall** — `node spyfall/server.js` (port 3200) — the hidden-role game where
+  everyone shares a location except one secret spy. Secret role cards, a synced
+  timer, accusation voting, and scoring. See [`spyfall/README.md`](spyfall/README.md).
 
 ---
 
