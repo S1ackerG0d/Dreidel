@@ -2,7 +2,7 @@
 
 Self-hosted multiplayer party games for your own Linux PC. Everyone on the same
 network joins from their phone or laptop browser — no app installs, no internet
-required, **zero dependencies**. Five games live here:
+required, **zero dependencies**. Six games live here:
 
 - **🕎 Dreidel** — `node server.js` (port 3000) — the full dreidel game below.
 - **🃏 Card Table** — `node cards/server.js` (port 3100) — a shared 52-card deck
@@ -17,6 +17,11 @@ required, **zero dependencies**. Five games live here:
 - **Rock Paper Scissors** — `node rps/server.js` (port 3400) — simultaneous secret
   throws for 2–12 players with round-robin scoring, first to a target score wins.
   See [`rps/README.md`](rps/README.md).
+- **🎲 Settlers** — `node catan/server.js` (port 3500) — Settlers of Catan (core
+  base game) for 2–4 players: a clickable hex board, dice and resources, roads /
+  settlements / cities, the robber, development cards, harbours, and longest
+  road / largest army. First to 10 points wins. See
+  [`catan/README.md`](catan/README.md).
 
 ---
 

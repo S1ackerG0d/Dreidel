@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Settlers — LAN Party</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>🎲 Settlers</h1>
+      <p id="connection" class="status">Connecting…</p>
+    </header>
+
+    <!-- Join -->
+    <section id="join-screen" class="card hidden">
+      <h2>Join the game</h2>
+      <div class="field">
+        <input id="name-input" type="text" maxlength="20" placeholder="Your name" autocomplete="off" />
+        <button id="join-btn">Join</button>
+      </div>
+      <p id="join-error" class="error"></p>
+      <p class="hint">Everyone on the same Wi-Fi opens this page and joins. 2–4 players.</p>
+    </section>
+
+    <!-- Lobby -->
+    <section id="lobby-screen" class="card hidden">
+      <h2>Lobby</h2>
+      <ul id="lobby-players" class="player-list"></ul>
+      <div id="host-lobby" class="hidden">
+        <button id="start-btn">Start game</button>
+        <p class="hint">Snake-draft setup: each player places two settlements and two roads.</p>
+      </div>
+      <p id="wait-host" class="hint hidden">Waiting for the host to start…</p>
+    </section>
+
+    <!-- Game -->
+    <section id="play-screen" class="hidden">
+      <div id="board-wrap" class="card">
+        <div id="board-status"></div>
+        <div id="board-container">
+          <svg id="board" xmlns="http://www.w3.org/2000/svg"></svg>
+        </div>
+        <p id="action-hint" class="hint"></p>
+        <p id="play-error" class="error"></p>
+      </div>
+
+      <div class="card">
+        <h2>Players</h2>
+        <ul id="scoreboard" class="player-list"></ul>
+      </div>
+
+      <div id="hand-card" class="card hidden">
+        <h2>Your hand <span id="your-vp" class="vp-pill"></span></h2>
+        <div id="resources" class="resources"></div>
+        <div id="dev-cards" class="dev-cards"></div>
+
+        <div id="controls" class="controls"></div>
+
+        <div id="trade-panel" class="panel hidden">
+          <h3>Bank / harbour trade</h3>
+          <div class="trade-row">
+            <label>Give <select id="trade-give"></select></label>
+            <span class="arrow">→</span>
+            <label>Get <select id="trade-receive"></select></label>
+            <button id="trade-btn">Trade</button>
+          </div>
+          <p id="trade-rates" class="hint"></p>
+        </div>
+
+        <div id="discard-panel" class="panel hidden">
+          <h3>Discard <span id="discard-count"></span> cards</h3>
+          <div id="discard-controls" class="resources"></div>
+          <button id="discard-btn">Discard</button>
+        </div>
+
+        <div id="plenty-panel" class="panel hidden">
+          <h3>Year of Plenty — pick two</h3>
+          <div class="trade-row">
+            <select id="plenty-1"></select>
+            <select id="plenty-2"></select>
+            <button id="plenty-btn">Take</button>
+          </div>
+        </div>
+
+        <div id="monopoly-panel" class="panel hidden">
+          <h3>Monopoly — pick a resource</h3>
+          <div class="trade-row">
+            <select id="monopoly-res"></select>
+            <button id="monopoly-btn">Steal all</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Log</h2>
+        <ul id="log" class="log"></ul>
+      </div>
+    </section>
+
+    <!-- Game over -->
+    <section id="over-screen" class="card hidden">
+      <h2 id="winner-text"></h2>
+      <ul id="final-scoreboard" class="player-list"></ul>
+      <button id="again-btn" class="hidden">Play again</button>
+    </section>
+
+    <footer>
+      <p class="legend">
+        <strong>Build:</strong> Road 🌲🧱 · Settlement 🌲🧱🐑🌾 · City 🌾🌾⛏️⛏️⛏️ · Dev card 🐑🌾⛏️ — first to 10 points wins.
+      </p>
+    </footer>
+  </div>
+  <script src="client.js"></script>
+</body>
+</html>
