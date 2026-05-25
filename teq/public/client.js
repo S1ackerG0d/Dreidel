@@ -5,7 +5,6 @@ const $ = (id) => document.getElementById(id);
 let playerId = localStorage.getItem('teq_player_id');
 let state = null;
 let evtSource = null;
-let countdownInterval = null;
 
 // ---------------------------------------------------------------------------
 // Networking
@@ -25,11 +24,7 @@ function connectEvents() {
   if (!playerId) return;
   if (evtSource) evtSource.close();
   evtSource = new EventSource('/api/events?playerId=' + encodeURIComponent(playerId));
-  evtSource.onmessage = (e) => {
-    state = JSON.parse(e.data);
-    setConnection(true);
-    render();
-  };
+  evtSource.onmessage = (e) => { state = JSON.parse(e.data); setConnection(true); render(); };
   evtSource.onerror = () => setConnection(false);
 }
 
@@ -37,26 +32,6 @@ function setConnection(online) {
   const el = $('connection');
   el.textContent = online ? 'Connected' : 'Reconnecting…';
   el.className = 'status ' + (online ? 'online' : 'offline');
-}
-
-// ---------------------------------------------------------------------------
-// Timer
-// ---------------------------------------------------------------------------
-function startCountdown() {
-  if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
-  if (!state || !state.timerEnd) return;
-
-  function update() {
-    const remaining = Math.max(0, Math.ceil((state.timerEnd - Date.now()) / 1000));
-    const text = remaining > 0 ? `⏱ ${remaining}s` : '⏰';
-    ['timer-writing', 'timer-voting', 'timer-results'].forEach((id) => {
-      const el = $(id);
-      if (el) el.textContent = text;
-    });
-    if (remaining <= 0) { clearInterval(countdownInterval); countdownInterval = null; }
-  }
-  update();
-  countdownInterval = setInterval(update, 500);
 }
 
 // ---------------------------------------------------------------------------
@@ -70,19 +45,27 @@ function escapeHtml(s) {
 
 function playerTags(p) {
   const tags = [];
-  if (p.id === state.hostId) tags.push('<span class="tag host">host</span>');
+  if (state.organizerId === p.id) tags.push('<span class="tag organizer">organizer</span>');
+  if (state.hostId === p.id) tags.push('<span class="tag host">host</span>');
   if (p.id === playerId) tags.push('<span class="tag you">you</span>');
-  if (!p.connected) tags.push('<span class="tag offline">offline</span>');
+  if (p.connected === false) tags.push('<span class="tag offline">offline</span>');
   return tags.join(' ');
+}
+
+function numberHint(n) {
+  if (n === null || n === undefined) return '';
+  if (n <= 2) return 'very low — answer should be pretty bad/weak/extreme in a bad way';
+  if (n <= 4) return 'low — lean toward the weaker or less impressive end';
+  if (n <= 6) return 'middle — a solid, reasonable answer, not too extreme either way';
+  if (n <= 8) return 'high — lean toward impressive or intense';
+  return 'very high — give the most impressive, powerful, or extreme answer you can';
 }
 
 // ---------------------------------------------------------------------------
 // Render
 // ---------------------------------------------------------------------------
 function render() {
-  if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
-
-  const known = state && state.players.some((p) => p.id === playerId);
+  const known = state && state.players && state.players.some((p) => p.id === playerId);
   if (playerId && state && !known) {
     localStorage.removeItem('teq_player_id');
     playerId = null;
@@ -91,20 +74,28 @@ function render() {
 
   const showJoin = !playerId || !known;
   const phase = state ? state.phase : null;
+  const active = phase && phase !== 'lobby' && !showJoin;
+
+  // Score bar
+  $('score-bar').classList.toggle('hidden', !active);
+  if (active) {
+    $('good-score').textContent = `✓ Good: ${state.goodCards} / 3`;
+    $('bad-score').textContent = `✗ Bad: ${state.badCards} / 3`;
+  }
 
   $('join-screen').classList.toggle('hidden', !showJoin);
   $('lobby-screen').classList.toggle('hidden', !(phase === 'lobby' && !showJoin));
-  $('writing-screen').classList.toggle('hidden', !(phase === 'writing' && !showJoin));
-  $('voting-screen').classList.toggle('hidden', !(phase === 'voting' && !showJoin));
-  $('results-screen').classList.toggle('hidden', !(phase === 'results' && !showJoin));
-  $('over-screen').classList.toggle('hidden', !(phase === 'gameover' && !showJoin));
+  $('answering-screen').classList.toggle('hidden', !(phase === 'answering' && !showJoin));
+  $('ordering-screen').classList.toggle('hidden', !(phase === 'ordering' && !showJoin));
+  $('roundover-screen').classList.toggle('hidden', !(phase === 'roundover' && !showJoin));
+  $('gameover-screen').classList.toggle('hidden', !(phase === 'gameover' && !showJoin));
 
   if (!state || showJoin) return;
 
   if (phase === 'lobby') renderLobby();
-  else if (phase === 'writing') renderWriting();
-  else if (phase === 'voting') renderVoting();
-  else if (phase === 'results') renderResults();
+  else if (phase === 'answering') renderAnswering();
+  else if (phase === 'ordering') renderOrdering();
+  else if (phase === 'roundover') renderRoundover();
   else if (phase === 'gameover') renderGameover();
 }
 
@@ -112,115 +103,172 @@ function renderLobby() {
   const isHost = playerId === state.hostId;
   $('host-lobby').classList.toggle('hidden', !isHost);
   $('wait-host').classList.toggle('hidden', isHost);
-  if (isHost) {
-    $('rounds-input').value = state.totalRounds;
-    $('start-btn').disabled = state.players.length < 2;
-  }
-  $('lobby-players').innerHTML = state.players
+  if (isHost) $('start-btn').disabled = (state.players || []).length < 3;
+  $('lobby-players').innerHTML = (state.players || [])
     .map((p) => `<li><span class="left"><span class="pname">${escapeHtml(p.name)}</span> ${playerTags(p)}</span></li>`)
     .join('');
 }
 
-function renderWriting() {
-  $('writing-round').textContent = `Round ${state.round} of ${state.totalRounds}`;
-  $('writing-prompt').textContent = state.currentPrompt || '';
-  $('submitted-count').textContent = `${state.submittedCount} of ${state.expectedCount} submitted`;
+function renderAnswering() {
+  const players = state.players || [];
+  const org = players.find((p) => p.id === state.organizerId);
+  const current = players.find((p) => p.id === state.currentAnswererId);
+  const isMyTurn = playerId === state.currentAnswererId;
+  const myNum = state.myNumber;
 
-  const submitted = state.myResponseSubmitted;
-  $('response-area').classList.toggle('hidden', !!submitted);
-  $('submitted-msg').classList.toggle('hidden', !submitted);
+  // Header
+  $('answering-organizer').textContent = org
+    ? `Organizer: ${org.name}`
+    : 'Organizer';
+  $('answering-question').textContent = state.question || '';
+  $('answering-progress').textContent =
+    `${state.answeredCount || 0} of ${players.length} answered · ${state.allowedMistakes} mistake(s) allowed`;
 
-  startCountdown();
-}
-
-function renderVoting() {
-  $('voting-round').textContent = `Round ${state.round} of ${state.totalRounds}`;
-  $('voting-prompt').textContent = state.currentPrompt || '';
-  $('voted-count').textContent = `${state.votedCount} of ${state.expectedCount} voted`;
-
-  const container = $('responses-list');
-  container.innerHTML = '';
-  const hasVoted = state.myVoteIdx !== null;
-
-  for (const r of (state.responses || [])) {
-    const isMyVote = state.myVoteIdx === r.idx;
-    const div = document.createElement('div');
-    div.className = 'response-card' +
-      (r.canVote ? ' voteable' : ' own-response') +
-      (isMyVote ? ' my-vote' : '');
-
-    const textP = document.createElement('p');
-    textP.className = 'response-text';
-    textP.textContent = r.text;
-    div.appendChild(textP);
-
-    if (!r.canVote) {
-      const lbl = document.createElement('p');
-      lbl.className = 'own-label';
-      lbl.textContent = '← Your response';
-      div.appendChild(lbl);
-    } else {
-      const btn = document.createElement('button');
-      btn.className = 'vote-btn' + (isMyVote ? ' voted' : '');
-      btn.textContent = isMyVote ? '✓ Voted!' : 'Vote for this';
-      btn.disabled = hasVoted;
-      btn.addEventListener('click', () => action('vote', { idx: r.idx }));
-      div.appendChild(btn);
-    }
-
-    container.appendChild(div);
+  // Number badge
+  const badge = $('my-number');
+  if (myNum !== null && myNum !== undefined) {
+    badge.textContent = myNum;
+    badge.classList.remove('hidden');
+  } else {
+    badge.classList.add('hidden');
   }
 
-  startCountdown();
+  // Input card vs wait card
+  $('answer-input-card').classList.toggle('hidden', !isMyTurn);
+  $('answer-wait-card').classList.toggle('hidden', isMyTurn);
+
+  if (isMyTurn) {
+    $('answer-scale-hint').textContent = myNum !== null
+      ? `Your number is ${myNum} — ${numberHint(myNum)}.`
+      : '';
+    $('answer-input').focus();
+  } else if (current) {
+    $('answer-wait-msg').textContent = `Waiting for ${current.name} to answer…`;
+    $('my-number-hint').textContent = myNum !== null
+      ? `Your number is ${myNum} — ${numberHint(myNum)}.`
+      : '';
+  }
+
+  // Answers so far
+  const answers = state.answers || [];
+  $('answers-so-far').classList.toggle('hidden', answers.length === 0);
+  $('answers-list').innerHTML = answers
+    .map((a) => `
+      <div class="answer-entry">
+        <span class="answer-player">${escapeHtml(a.playerName)}</span>
+        <span class="answer-text">${escapeHtml(a.answer)}</span>
+      </div>`)
+    .join('');
 }
 
-function renderResults() {
+function renderOrdering() {
+  const players = state.players || [];
+  const isOrg = playerId === state.organizerId;
+  const org = players.find((p) => p.id === state.organizerId);
+  const orderedIds = state.orderedIds || [];
+  const allRevealedIds = state.allRevealedIds || [];
+  const discardedIds = allRevealedIds.filter((id) => !orderedIds.includes(id));
+  const unrevealedPlayers = players.filter((p) => !allRevealedIds.includes(p.id));
+
+  $('ordering-organizer-label').textContent = isOrg
+    ? 'You are the Organizer — click players to reveal their cards, lowest first'
+    : `${org?.name || 'Organizer'} is choosing the order…`;
+  $('ordering-question').textContent = state.question || '';
+  $('mistake-counter').textContent =
+    `Mistakes: ${state.mistakes} of ${state.allowedMistakes} allowed`;
+
+  // Current sequence
+  const seqPlayers = orderedIds.map((id) => players.find((p) => p.id === id)).filter(Boolean);
+  $('sequence-empty').classList.toggle('hidden', seqPlayers.length > 0);
+  $('current-sequence').innerHTML = seqPlayers
+    .map((p) => `
+      <div class="reveal-card ok">
+        <span class="num-chip">${p.number}</span>
+        <span class="reveal-name">${escapeHtml(p.name)}</span>
+        <span class="reveal-answer">"${escapeHtml(p.answer || '')}"</span>
+      </div>`)
+    .join('');
+
+  // Discarded
+  $('discarded-card').classList.toggle('hidden', discardedIds.length === 0);
+  if (discardedIds.length > 0) {
+    const dp = discardedIds.map((id) => players.find((p) => p.id === id)).filter(Boolean);
+    $('discarded-list').innerHTML = dp
+      .map((p) => `
+        <div class="reveal-card discarded">
+          <span class="num-chip">${p.number}</span>
+          <span class="reveal-name">${escapeHtml(p.name)}</span>
+          <span class="reveal-answer">"${escapeHtml(p.answer || '')}"</span>
+        </div>`)
+      .join('');
+  }
+
+  // Unrevealed
+  $('unrevealed-heading').textContent = isOrg
+    ? `Click to reveal next (${unrevealedPlayers.length} left)`
+    : `Not yet revealed (${unrevealedPlayers.length} left)`;
+  $('unrevealed-empty').classList.toggle('hidden', unrevealedPlayers.length > 0);
+
+  const list = $('unrevealed-list');
+  list.innerHTML = '';
+  for (const p of unrevealedPlayers) {
+    const div = document.createElement('div');
+    div.className = 'unrevealed-card' + (isOrg ? ' clickable' : '');
+    div.innerHTML = `
+      <span class="reveal-name">${escapeHtml(p.name)}</span>
+      <span class="reveal-answer">"${escapeHtml(p.answer || '')}"</span>`;
+    if (isOrg) {
+      div.addEventListener('click', () => action('revealNext', { targetId: p.id }));
+    }
+    list.appendChild(div);
+  }
+}
+
+function renderRoundover() {
   const isHost = playerId === state.hostId;
-  $('results-round').textContent = `Round ${state.round} of ${state.totalRounds}`;
-  $('next-round-btn').classList.toggle('hidden', !isHost);
+  const isGood = state.roundResult === 'good';
 
-  const results = state.roundResults || [];
-  const maxVotes = Math.max(...results.map((r) => r.votes), 0);
+  const banner = $('result-banner');
+  banner.className = 'card result-banner ' + (isGood ? 'good' : 'bad');
+  $('round-result-text').textContent = isGood ? '✓ Good Card!' : '✗ Bad Card';
+  $('score-summary').textContent =
+    `Score: ${state.goodCards} Good  ·  ${state.badCards} Bad  ·  `
+    + `(${state.mistakes} mistake${state.mistakes !== 1 ? 's' : ''}, ${state.allowedMistakes} allowed)`;
 
-  $('results-list').innerHTML = [...results]
-    .sort((a, b) => b.votes - a.votes)
-    .map((r) => `
-      <div class="result-card${r.votes === maxVotes && maxVotes > 0 ? ' winner' : ''}">
-        <p class="result-text">${escapeHtml(r.text)}</p>
-        <div class="result-meta">
-          <span class="result-author">${escapeHtml(r.playerName)}</span>
-          <span class="result-votes">${r.votes} vote${r.votes !== 1 ? 's' : ''}${r.bonus ? ' 🏆 +2' : ''}</span>
+  $('roundover-question').textContent = state.question || '';
+
+  // Sort all players by number
+  const sorted = [...(state.players || [])].sort((a, b) => a.number - b.number);
+  $('roundover-answers').innerHTML = sorted
+    .map((p) => `
+      <div class="roundover-row">
+        <span class="num-chip">${p.number}</span>
+        <div class="roundover-details">
+          <span class="roundover-name">${escapeHtml(p.name)}</span>
+          <span class="roundover-answer">"${escapeHtml(p.answer || '(no answer)')}"</span>
         </div>
-      </div>
-    `).join('');
+      </div>`)
+    .join('');
 
-  $('results-scoreboard').innerHTML = [...state.players]
-    .sort((a, b) => b.score - a.score)
-    .map((p) => `<li>
-      <span class="left"><span class="pname">${escapeHtml(p.name)}</span> ${playerTags(p)}</span>
-      <span class="score">${p.score}</span>
-    </li>`).join('');
-
-  $('results-log').innerHTML = state.log.slice().reverse()
-    .map((l) => `<li>${escapeHtml(l.message)}</li>`).join('');
-
-  startCountdown();
+  $('next-round-btn').classList.toggle('hidden', !isHost);
+  $('wait-next').classList.toggle('hidden', isHost);
 }
 
 function renderGameover() {
   const isHost = playerId === state.hostId;
-  const sorted = [...state.players].sort((a, b) => b.score - a.score);
-  const winner = sorted[0];
-  $('winner-text').textContent = winner
-    ? `🏆 ${winner.name} wins with ${winner.score} points!`
-    : 'Game over!';
-  $('play-again-btn').classList.toggle('hidden', !isHost);
+  const isWin = state.goodCards >= 3;
 
-  $('final-scoreboard').innerHTML = sorted
-    .map((p) => `<li>
-      <span class="left"><span class="pname">${escapeHtml(p.name)}</span> ${playerTags(p)}</span>
-      <span class="score">${p.score}</span>
-    </li>`).join('');
+  const banner = $('gameover-banner');
+  banner.className = 'card result-banner ' + (isWin ? 'good' : 'bad');
+  $('gameover-text').textContent = isWin ? '🎉 You all win!' : '💀 You all lose!';
+  $('gameover-score').textContent =
+    `Final: ${state.goodCards} Good Card${state.goodCards !== 1 ? 's' : ''}, ${state.badCards} Bad Card${state.badCards !== 1 ? 's' : ''}`;
+
+  $('new-game-btn').classList.toggle('hidden', !isHost);
+  $('wait-newgame').classList.toggle('hidden', isHost);
+
+  $('gameover-log').innerHTML = (state.log || []).slice().reverse()
+    .map((l) => `<li>${escapeHtml(l.message)}</li>`).join('');
 }
 
 // ---------------------------------------------------------------------------
@@ -241,26 +289,24 @@ $('join-btn').addEventListener('click', async () => {
 $('name-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('join-btn').click(); });
 
 $('start-btn').addEventListener('click', () => action('start'));
-$('rounds-input').addEventListener('change', (e) =>
-  action('setRounds', { value: Number(e.target.value) }));
 
-$('submit-btn').addEventListener('click', async () => {
-  const text = $('response-input').value.trim();
-  if (!text) { $('submit-error').textContent = 'Please write something first.'; return; }
-  $('submit-error').textContent = '';
-  $('submit-btn').disabled = true;
-  const result = await action('submit', { text });
-  $('submit-btn').disabled = false;
-  if (result.error) { $('submit-error').textContent = result.error; }
+$('answer-btn').addEventListener('click', async () => {
+  const answer = $('answer-input').value.trim();
+  if (!answer) { $('answer-error').textContent = 'Please type an answer.'; return; }
+  $('answer-error').textContent = '';
+  $('answer-btn').disabled = true;
+  const result = await action('submitAnswer', { answer });
+  $('answer-btn').disabled = false;
+  if (result.error) { $('answer-error').textContent = result.error; return; }
+  $('answer-input').value = '';
 });
 
-$('response-input').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('submit-btn').click(); }
+$('answer-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('answer-btn').click(); }
 });
 
 $('next-round-btn').addEventListener('click', () => action('nextRound'));
-$('play-again-btn').addEventListener('click', () => action('toLobby'));
+$('new-game-btn').addEventListener('click', () => action('newGame'));
 
-// Boot
 if (playerId) connectEvents();
 render();

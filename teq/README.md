@@ -1,7 +1,8 @@
 # 📈 That Escalated Quickly — LAN Party Edition
 
-A multiplayer party game where mundane situations spiral completely out of control.
-Host it on your own PC — everyone joins from their phone or laptop browser.
+A cooperative party game where players secretly hold number cards 1–10 and must
+answer a question in a way that hints at their number — without ever saying it.
+Host it on your own PC, everyone joins from their phone or laptop browser.
 No app installs, no internet required, **zero dependencies**.
 
 ## Run it
@@ -10,8 +11,6 @@ No app installs, no internet required, **zero dependencies**.
 node teq/server.js
 ```
 
-The server prints addresses to share:
-
 ```
   📈  That Escalated Quickly server running!
 
@@ -19,40 +18,62 @@ The server prints addresses to share:
   On your LAN:         http://192.168.1.42:3600
 ```
 
-Tell everyone on your network to open the **LAN address** in their browser.
-
 ## How to play
 
-Each round proceeds in three phases:
+### Setup
+- 3–10 players. The first to join is the host.
+- Each round, one player is the **Organizer** (role rotates clockwise).
 
-### 1. Write (90 seconds)
-Everyone sees the same starting scenario — something small and ordinary:
+### Each round
 
-> *You're at a quiet library and you accidentally knock over a single book…*
+1. **Deal** — Everyone receives a secret number card (1–10). You can see your
+   own number but not anyone else's.
 
-Each player secretly types how this situation spirals completely out of control.
+2. **Answer** — The Organizer reads a question aloud. Players answer one at a
+   time (starting with the Organizer, going clockwise). Your answer must
+   **hint at your number** on the scale without giving it away directly.
+   - 1 = least extreme / weakest / worst
+   - 10 = most extreme / strongest / best
 
-### 2. Vote (45 seconds)
-All responses are revealed **anonymously**. Players vote for their favourite —
-you can't vote for your own.
+   You may **not** say your number, say words like "the best," "the worst,"
+   "halfway," or "middle," or change your answer after saying it.
 
-### 3. Results
-Votes are revealed along with who wrote each response.
+3. **Organize** — After everyone has answered, the Organizer tries to reveal
+   the number cards **from lowest to highest**. They click each player (in
+   the order they believe is correct); the card flips immediately when clicked.
 
-**Scoring:**
-- **1 point** per vote your response receives
-- **+2 bonus points** if you got the most votes (sole winner of the round)
+4. **Score the round:**
+   - All cards revealed in correct order → **Good Card** ✓
+   - A card is revealed out of order → **Mistake**
 
-After all rounds, the player with the most points wins!
+### Allowed mistakes
 
-## Settings
+| Players | Mistakes allowed |
+|---------|-----------------|
+| 3       | 1               |
+| 4–5     | 0               |
+| 6–10    | 1               |
 
-- **Rounds:** 1–10 (default 5). Set in the lobby before the game starts.
+When a mistake is allowed: all currently revealed cards are discarded, and the
+Organizer continues ordering the remaining players from scratch. If mistakes
+exceed the limit, the round ends as a **Bad Card** ✗.
+
+### Winning and losing
+
+The whole group wins or loses together:
+
+- **3 Good Cards** → everyone wins 🎉
+- **3 Bad Cards** → everyone loses 💀
+
+## Tips
+
+- Middle numbers (4–6) are the hardest to hint at — don't be too obvious.
+- Think about how the Organizer interprets the scale, not just what sounds
+  clever.
+- Listen carefully to earlier answers; they give you context for calibrating
+  your own.
 
 ## Notes
 
-- 2–12 players. The first to join is the host.
-- The game auto-advances between phases when everyone has submitted or voted,
-  or after the timer runs out — whichever comes first.
-- During results, the host can manually skip to the next round.
+- If a player leaves mid-game, the game resets to the lobby.
 - Change the port: `PORT=8080 node teq/server.js`

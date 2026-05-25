@@ -13,6 +13,13 @@
       <p id="connection" class="status">Connecting…</p>
     </header>
 
+    <!-- Score bar (shown during active game) -->
+    <div id="score-bar" class="score-bar hidden">
+      <span id="good-score" class="good-score"></span>
+      <span class="score-sep">·</span>
+      <span id="bad-score" class="bad-score"></span>
+    </div>
+
     <!-- Join -->
     <section id="join-screen" class="card hidden">
       <h2>Join the game</h2>
@@ -27,101 +34,111 @@
     <section id="lobby-screen" class="card hidden">
       <h2>Lobby</h2>
       <div id="host-lobby" class="hidden">
-        <div class="field">
-          <label for="rounds-input">Rounds:</label>
-          <input id="rounds-input" type="number" min="1" max="10" value="5" />
-        </div>
         <button id="start-btn">Start game</button>
-        <p class="hint">Need at least 2 players. Each round: write a funny escalation, vote for the best, score points!</p>
+        <p class="hint">Need at least 3 players. Work together to earn 3 Good Cards before collecting 3 Bad Cards.</p>
       </div>
       <p id="wait-host" class="hint hidden">Waiting for the host to start…</p>
       <ul id="lobby-players" class="player-list"></ul>
     </section>
 
-    <!-- Writing -->
-    <section id="writing-screen" class="hidden">
-      <div class="card prompt-card">
+    <!-- Answering phase -->
+    <section id="answering-screen" class="hidden">
+      <div class="card question-card">
         <div class="field between">
-          <span class="round-label" id="writing-round"></span>
-          <span class="timer" id="timer-writing"></span>
+          <span class="phase-label" id="answering-organizer"></span>
+          <span class="number-badge" id="my-number" title="Your secret number — hint at this without saying it!"></span>
         </div>
-        <p class="phase-label">The scenario:</p>
-        <p class="prompt-text" id="writing-prompt"></p>
-        <p class="hint" id="submitted-count"></p>
+        <p class="question-text" id="answering-question"></p>
+        <p class="hint" id="answering-progress"></p>
       </div>
 
-      <div class="card" id="response-area">
-        <h2>Your escalation</h2>
-        <p class="hint">How does this spiral completely out of control? Continue the story…</p>
-        <textarea id="response-input" rows="4" maxlength="280" placeholder="Then suddenly…"></textarea>
+      <!-- My turn to answer -->
+      <div class="card hidden" id="answer-input-card">
+        <h2>Your turn to answer</h2>
+        <p class="hint" id="answer-scale-hint"></p>
+        <textarea id="answer-input" rows="3" maxlength="200" placeholder="Type your answer…"></textarea>
         <div class="field" style="margin-top:0.6rem">
-          <button id="submit-btn">Submit escalation</button>
-          <span id="submit-error" class="error"></span>
+          <button id="answer-btn">Submit answer</button>
+          <span id="answer-error" class="error"></span>
         </div>
       </div>
 
-      <div class="card hidden" id="submitted-msg">
-        <h2>Escalation submitted ✓</h2>
-        <p class="hint">Sit tight while the other players write their escalations…</p>
+      <!-- Waiting for someone else -->
+      <div class="card hidden" id="answer-wait-card">
+        <p id="answer-wait-msg" class="hint" style="margin:0"></p>
+        <p class="hint" id="my-number-hint" style="margin-top:0.4rem"></p>
+      </div>
+
+      <!-- Answers submitted so far -->
+      <div class="card hidden" id="answers-so-far">
+        <h2>Answers so far</h2>
+        <div id="answers-list"></div>
       </div>
     </section>
 
-    <!-- Voting -->
-    <section id="voting-screen" class="hidden">
-      <div class="card prompt-card">
-        <div class="field between">
-          <span class="round-label" id="voting-round"></span>
-          <span class="timer" id="timer-voting"></span>
-        </div>
-        <p class="phase-label">The scenario:</p>
-        <p class="prompt-text" id="voting-prompt"></p>
-        <p class="hint" id="voted-count"></p>
+    <!-- Ordering phase -->
+    <section id="ordering-screen" class="hidden">
+      <div class="card question-card">
+        <p class="phase-label" id="ordering-organizer-label"></p>
+        <p class="question-text" id="ordering-question"></p>
+        <p class="hint" id="mistake-counter"></p>
       </div>
 
+      <!-- Current sequence (lowest → highest) -->
       <div class="card">
-        <h2>Vote for the best escalation</h2>
-        <p class="hint">Pick the most outrageous or creative one. You can't vote for your own!</p>
-        <div id="responses-list"></div>
+        <h2>Revealed — lowest → highest</h2>
+        <div id="current-sequence"></div>
+        <p id="sequence-empty" class="hint">Nothing revealed yet.</p>
+      </div>
+
+      <!-- Discarded after a mistake -->
+      <div class="card hidden" id="discarded-card">
+        <h2>Discarded after mistake</h2>
+        <div id="discarded-list"></div>
+      </div>
+
+      <!-- Players not yet revealed -->
+      <div class="card">
+        <h2 id="unrevealed-heading"></h2>
+        <div id="unrevealed-list"></div>
+        <p id="unrevealed-empty" class="hint hidden">All players have been placed.</p>
       </div>
     </section>
 
-    <!-- Results -->
-    <section id="results-screen" class="hidden">
-      <div class="card">
-        <div class="field between">
-          <span class="round-label" id="results-round"></span>
-          <div class="field" style="gap:0.5rem">
-            <span class="timer small" id="timer-results"></span>
-            <button id="next-round-btn" class="hidden">Next round →</button>
-          </div>
-        </div>
+    <!-- Round over -->
+    <section id="roundover-screen" class="hidden">
+      <div class="card result-banner" id="result-banner">
+        <h2 id="round-result-text"></h2>
+        <p id="score-summary" class="hint" style="margin:0.3rem 0 0"></p>
       </div>
 
       <div class="card">
-        <h2>Round results</h2>
-        <div id="results-list"></div>
+        <h2>The question</h2>
+        <p class="question-text" id="roundover-question"></p>
       </div>
 
       <div class="card">
-        <h2>Scoreboard</h2>
-        <ul id="results-scoreboard" class="player-list"></ul>
+        <h2>All answers (sorted lowest → highest)</h2>
+        <div id="roundover-answers"></div>
       </div>
 
       <div class="card">
-        <h2>Log</h2>
-        <ul id="results-log" class="log"></ul>
+        <button id="next-round-btn" class="hidden">Next round →</button>
+        <p id="wait-next" class="hint hidden">Waiting for the host to start the next round…</p>
       </div>
     </section>
 
     <!-- Game over -->
-    <section id="over-screen" class="hidden">
-      <div class="card over-card">
-        <h2 id="winner-text"></h2>
-        <button id="play-again-btn" class="hidden">Back to lobby</button>
+    <section id="gameover-screen" class="hidden">
+      <div class="card result-banner" id="gameover-banner">
+        <h2 id="gameover-text"></h2>
+        <p id="gameover-score" class="hint" style="margin:0.4rem 0 0.8rem"></p>
+        <button id="new-game-btn" class="hidden">Play again</button>
+        <p id="wait-newgame" class="hint hidden">Waiting for the host…</p>
       </div>
       <div class="card">
-        <h2>Final scores</h2>
-        <ul id="final-scoreboard" class="player-list"></ul>
+        <h2>Log</h2>
+        <ul id="gameover-log" class="log"></ul>
       </div>
     </section>
   </div>

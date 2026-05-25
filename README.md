@@ -2,7 +2,7 @@
 
 Self-hosted multiplayer party games for your own Linux PC. Everyone on the same
 network joins from their phone or laptop browser — no app installs, no internet
-required, **zero dependencies**. Six games live here:
+required, **zero dependencies**. Seven games live here:
 
 - **🕎 Dreidel** — `node server.js` (port 3000) — the full dreidel game below.
 - **🃏 Card Table** — `node cards/server.js` (port 3100) — a shared 52-card deck
@@ -22,10 +22,11 @@ required, **zero dependencies**. Six games live here:
   settlements / cities, the robber, development cards, harbours, and longest
   road / largest army. First to 10 points wins. See
   [`catan/README.md`](catan/README.md).
-- **📈 That Escalated Quickly** — `node teq/server.js` (port 3600) — a
-  Quiplash-style party game where players write funny escalations of mundane
-  scenarios, then vote for the best one. Points for votes; most points wins.
-  See [`teq/README.md`](teq/README.md).
+- **📈 That Escalated Quickly** — `node teq/server.js` (port 3600) — cooperative
+  party game for 3–10 players. Each player holds a secret number 1–10 and answers
+  a question hinting at it; the Organizer must sort everyone lowest to highest.
+  Earn 3 Good Cards together before collecting 3 Bad Cards. See
+  [`teq/README.md`](teq/README.md).
 
 ---
 
