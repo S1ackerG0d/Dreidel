@@ -22,6 +22,10 @@ required, **zero dependencies**. Six games live here:
   settlements / cities, the robber, development cards, harbours, and longest
   road / largest army. First to 10 points wins. See
   [`catan/README.md`](catan/README.md).
+- **📈 That Escalated Quickly** — `node teq/server.js` (port 3600) — a
+  Quiplash-style party game where players write funny escalations of mundane
+  scenarios, then vote for the best one. Points for votes; most points wins.
+  See [`teq/README.md`](teq/README.md).
 
 ---
 

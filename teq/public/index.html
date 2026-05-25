@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>That Escalated Quickly — LAN</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>📈 That Escalated Quickly</h1>
+      <p id="connection" class="status">Connecting…</p>
+    </header>
+
+    <!-- Join -->
+    <section id="join-screen" class="card hidden">
+      <h2>Join the game</h2>
+      <div class="field">
+        <input id="name-input" type="text" placeholder="Your name" maxlength="20" autocomplete="off" />
+        <button id="join-btn">Join</button>
+      </div>
+      <p id="join-error" class="error"></p>
+    </section>
+
+    <!-- Lobby -->
+    <section id="lobby-screen" class="card hidden">
+      <h2>Lobby</h2>
+      <div id="host-lobby" class="hidden">
+        <div class="field">
+          <label for="rounds-input">Rounds:</label>
+          <input id="rounds-input" type="number" min="1" max="10" value="5" />
+        </div>
+        <button id="start-btn">Start game</button>
+        <p class="hint">Need at least 2 players. Each round: write a funny escalation, vote for the best, score points!</p>
+      </div>
+      <p id="wait-host" class="hint hidden">Waiting for the host to start…</p>
+      <ul id="lobby-players" class="player-list"></ul>
+    </section>
+
+    <!-- Writing -->
+    <section id="writing-screen" class="hidden">
+      <div class="card prompt-card">
+        <div class="field between">
+          <span class="round-label" id="writing-round"></span>
+          <span class="timer" id="timer-writing"></span>
+        </div>
+        <p class="phase-label">The scenario:</p>
+        <p class="prompt-text" id="writing-prompt"></p>
+        <p class="hint" id="submitted-count"></p>
+      </div>
+
+      <div class="card" id="response-area">
+        <h2>Your escalation</h2>
+        <p class="hint">How does this spiral completely out of control? Continue the story…</p>
+        <textarea id="response-input" rows="4" maxlength="280" placeholder="Then suddenly…"></textarea>
+        <div class="field" style="margin-top:0.6rem">
+          <button id="submit-btn">Submit escalation</button>
+          <span id="submit-error" class="error"></span>
+        </div>
+      </div>
+
+      <div class="card hidden" id="submitted-msg">
+        <h2>Escalation submitted ✓</h2>
+        <p class="hint">Sit tight while the other players write their escalations…</p>
+      </div>
+    </section>
+
+    <!-- Voting -->
+    <section id="voting-screen" class="hidden">
+      <div class="card prompt-card">
+        <div class="field between">
+          <span class="round-label" id="voting-round"></span>
+          <span class="timer" id="timer-voting"></span>
+        </div>
+        <p class="phase-label">The scenario:</p>
+        <p class="prompt-text" id="voting-prompt"></p>
+        <p class="hint" id="voted-count"></p>
+      </div>
+
+      <div class="card">
+        <h2>Vote for the best escalation</h2>
+        <p class="hint">Pick the most outrageous or creative one. You can't vote for your own!</p>
+        <div id="responses-list"></div>
+      </div>
+    </section>
+
+    <!-- Results -->
+    <section id="results-screen" class="hidden">
+      <div class="card">
+        <div class="field between">
+          <span class="round-label" id="results-round"></span>
+          <div class="field" style="gap:0.5rem">
+            <span class="timer small" id="timer-results"></span>
+            <button id="next-round-btn" class="hidden">Next round →</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Round results</h2>
+        <div id="results-list"></div>
+      </div>
+
+      <div class="card">
+        <h2>Scoreboard</h2>
+        <ul id="results-scoreboard" class="player-list"></ul>
+      </div>
+
+      <div class="card">
+        <h2>Log</h2>
+        <ul id="results-log" class="log"></ul>
+      </div>
+    </section>
+
+    <!-- Game over -->
+    <section id="over-screen" class="hidden">
+      <div class="card over-card">
+        <h2 id="winner-text"></h2>
+        <button id="play-again-btn" class="hidden">Back to lobby</button>
+      </div>
+      <div class="card">
+        <h2>Final scores</h2>
+        <ul id="final-scoreboard" class="player-list"></ul>
+      </div>
+    </section>
+  </div>
+  <script src="/client.js"></script>
+</body>
+</html>
