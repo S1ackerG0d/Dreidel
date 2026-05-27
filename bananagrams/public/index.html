@@ -46,6 +46,29 @@
       <p id="status-line" class="hint"></p>
 
       <div class="card board-card">
+        <div class="grid-controls">
+          <span class="gc-label">Grid</span>
+          <div class="gc-side">
+            <span class="gc-name">Top</span>
+            <button data-grid="add" data-side="top" title="Add a row above">+</button>
+            <button class="secondary" data-grid="remove" data-side="top" title="Remove the top row">−</button>
+          </div>
+          <div class="gc-side">
+            <span class="gc-name">Bottom</span>
+            <button data-grid="add" data-side="bottom" title="Add a row below">+</button>
+            <button class="secondary" data-grid="remove" data-side="bottom" title="Remove the bottom row">−</button>
+          </div>
+          <div class="gc-side">
+            <span class="gc-name">Left</span>
+            <button data-grid="add" data-side="left" title="Add a column on the left">+</button>
+            <button class="secondary" data-grid="remove" data-side="left" title="Remove the left column">−</button>
+          </div>
+          <div class="gc-side">
+            <span class="gc-name">Right</span>
+            <button data-grid="add" data-side="right" title="Add a column on the right">+</button>
+            <button class="secondary" data-grid="remove" data-side="right" title="Remove the right column">−</button>
+          </div>
+        </div>
         <div id="board" class="board"></div>
       </div>
 

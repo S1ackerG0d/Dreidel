@@ -9,6 +9,11 @@ let evtSource = null;
 // Selection: either a rack tile (place it) or a board tile (move it).
 let selected = null; // { type:'rack', tileId } | { type:'board', r, c, tileId }
 
+// Visible window into the (much larger) playing grid. The board grows outward
+// by panning/expanding this window rather than rendering the whole grid.
+let view = null; // { top, left, rows, cols }
+const DEFAULT_VIEW_SIZE = 15;
+
 // ---------------------------------------------------------------------------
 // Networking
 // ---------------------------------------------------------------------------
@@ -90,6 +95,8 @@ function render() {
     if (evtSource) evtSource.close();
   }
 
+  if (!state || state.phase !== 'playing') view = null;
+
   const showJoin = !playerId || !known;
   const inGame = state && (state.phase === 'playing') && !showJoin;
   const inVerify = state && (state.phase === 'verify' || state.phase === 'gameover') && !showJoin;
@@ -132,13 +139,81 @@ function renderGame() {
     .map((l) => `<li>${escapeHtml(l.message)}</li>`).join('');
 }
 
+function defaultView(n) {
+  const size = Math.min(DEFAULT_VIEW_SIZE, n);
+  const start = Math.floor((n - size) / 2);
+  return { top: start, left: start, rows: size, cols: size };
+}
+
+// Keep the visible window covering every placed tile plus a one-cell margin,
+// so the word chain always has an empty edge cell to extend into. This only
+// ever grows the window — manual shrinking is handled in applyGridChange.
+function fitView(board, n) {
+  if (!view) view = defaultView(n);
+  const keys = Object.keys(board);
+  if (!keys.length) return;
+  let minR = Infinity, maxR = -Infinity, minC = Infinity, maxC = -Infinity;
+  for (const k of keys) {
+    const [r, c] = k.split(',').map(Number);
+    minR = Math.min(minR, r); maxR = Math.max(maxR, r);
+    minC = Math.min(minC, c); maxC = Math.max(maxC, c);
+  }
+  const top = Math.max(0, Math.min(view.top, minR - 1));
+  const left = Math.max(0, Math.min(view.left, minC - 1));
+  const bottom = Math.min(n - 1, Math.max(view.top + view.rows - 1, maxR + 1));
+  const right = Math.min(n - 1, Math.max(view.left + view.cols - 1, maxC + 1));
+  view = { top, left, rows: bottom - top + 1, cols: right - left + 1 };
+}
+
+// Manually add/remove a row or column on one edge. Adding pans/grows the window
+// (up to the grid bound); removing shrinks it, but fitView immediately re-grows
+// it if the removal would have hidden a tile or its one-cell margin.
+function applyGridChange(action, side) {
+  const n = state.gridSize;
+  fitView(state.yourBoard, n);
+  const before = `${view.top},${view.left},${view.rows},${view.cols}`;
+  if (action === 'add') {
+    if (side === 'top' && view.top > 0) { view.top--; view.rows++; }
+    else if (side === 'bottom' && view.top + view.rows < n) { view.rows++; }
+    else if (side === 'left' && view.left > 0) { view.left--; view.cols++; }
+    else if (side === 'right' && view.left + view.cols < n) { view.cols++; }
+  } else {
+    if (side === 'top' && view.rows > 1) { view.top++; view.rows--; }
+    else if (side === 'bottom' && view.rows > 1) { view.rows--; }
+    else if (side === 'left' && view.cols > 1) { view.left++; view.cols--; }
+    else if (side === 'right' && view.cols > 1) { view.cols--; }
+  }
+  fitView(state.yourBoard, n);
+  renderBoard();
+  if (`${view.top},${view.left},${view.rows},${view.cols}` === before) {
+    setStatus(action === 'add'
+      ? 'Grid is already at its maximum size.'
+      : 'Can’t shrink past your word chain.');
+  } else {
+    setStatus('');
+  }
+}
+
+function updateGridControls(n) {
+  const set = (side, dis) => {
+    const b = document.querySelector(`[data-grid="add"][data-side="${side}"]`);
+    if (b) b.disabled = dis;
+  };
+  set('top', view.top <= 0);
+  set('bottom', view.top + view.rows >= n);
+  set('left', view.left <= 0);
+  set('right', view.left + view.cols >= n);
+}
+
 function renderBoard() {
   const n = state.gridSize;
+  fitView(state.yourBoard, n);
+  const { top, left, rows, cols } = view;
   const board = $('board');
-  board.style.gridTemplateColumns = `repeat(${n}, 30px)`;
+  board.style.gridTemplateColumns = `repeat(${cols}, 30px)`;
   let html = '';
-  for (let r = 0; r < n; r++) {
-    for (let c = 0; c < n; c++) {
+  for (let r = top; r < top + rows; r++) {
+    for (let c = left; c < left + cols; c++) {
       const tile = state.yourBoard[`${r},${c}`];
       if (tile) {
         html += `<div class="cell filled" data-r="${r}" data-c="${c}" data-tile="${tile.id}">${tile.letter}</div>`;
@@ -151,6 +226,7 @@ function renderBoard() {
   board.querySelectorAll('.cell').forEach((cell) => {
     cell.addEventListener('click', () => onCellClick(cell));
   });
+  updateGridControls(n);
 }
 
 function renderRack() {
@@ -276,6 +352,10 @@ $('recall-all-btn').addEventListener('click', async () => {
     await action('recall', { r, c });
   }
   selected = null;
+});
+
+document.querySelectorAll('[data-grid]').forEach((btn) => {
+  btn.addEventListener('click', () => applyGridChange(btn.dataset.grid, btn.dataset.side));
 });
 
 $('confirm-btn').addEventListener('click', () => action('confirmWin'));
