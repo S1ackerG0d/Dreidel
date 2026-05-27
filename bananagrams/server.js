@@ -9,7 +9,7 @@ const os = require('os');
 const PORT = Number(process.env.PORT) || 3300;
 const HOST = process.env.HOST || '0.0.0.0';
 const PUBLIC_DIR = path.join(__dirname, 'public');
-const GRID = 21; // 21x21 playing grid
+const GRID = 63; // max grid bound; each player's board can grow outward up to this size
 
 // Official Bananagrams letter distribution — 144 tiles total.
 const DISTRIBUTION = {
