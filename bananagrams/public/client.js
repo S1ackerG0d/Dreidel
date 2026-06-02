@@ -216,7 +216,8 @@ function renderBoard() {
     for (let c = left; c < left + cols; c++) {
       const tile = state.yourBoard[`${r},${c}`];
       if (tile) {
-        html += `<div class="cell filled" data-r="${r}" data-c="${c}" data-tile="${tile.id}">${tile.letter}</div>`;
+        const sel = selected && selected.type === 'board' && selected.r === r && selected.c === c;
+        html += `<div class="cell filled${sel ? ' selected' : ''}" data-r="${r}" data-c="${c}" data-tile="${tile.id}">${tile.letter}</div>`;
       } else {
         html += `<div class="cell target-ok" data-r="${r}" data-c="${c}"></div>`;
       }
@@ -245,6 +246,7 @@ function renderRack() {
         ? null
         : { type: 'rack', tileId: el.dataset.tile };
       renderRack();
+      renderBoard();
       setStatus(selected ? 'Tile selected — click a board cell to place it.' : '');
     });
   });
@@ -256,15 +258,26 @@ async function onCellClick(cell) {
   const occupied = cell.classList.contains('filled');
 
   if (occupied) {
-    // Clicking a placed tile: if we have a selection, ignore; otherwise pick it up.
-    if (selected) { selected = null; renderRack(); }
-    const res = await action('recall', { r, c });
-    if (res.error) flashError(res.error);
+    // If the same board tile is already selected, that second click recalls it.
+    if (selected && selected.type === 'board' && selected.r === r && selected.c === c) {
+      selected = null;
+      const res = await action('recall', { r, c });
+      if (res.error) flashError(res.error);
+      else setStatus('');
+      renderBoard();
+      renderRack();
+      return;
+    }
+    // Otherwise, select this placed tile so the next empty-cell click moves it.
+    selected = { type: 'board', r, c, tileId: cell.dataset.tile };
+    renderBoard();
+    renderRack();
+    setStatus('Tile selected — click an empty cell to move it, or click the tile again to send it back to your rack.');
     return;
   }
 
   // Empty cell.
-  if (!selected) { setStatus('Select a tile from your rack first.'); return; }
+  if (!selected) { setStatus('Select a tile from your rack — or a placed tile to move it.'); return; }
 
   let res;
   if (selected.type === 'rack') {
@@ -283,25 +296,51 @@ function renderVerify() {
   const claimant = state.players.find((p) => p.id === state.bananaClaimId) ||
                    state.players.find((p) => p.id === state.winnerId);
 
+  const single = $('reveal-board');
+  const all = $('reveal-all');
+
   if (state.phase === 'verify') {
     $('verify-title').textContent = `🍌 ${claimant ? claimant.name : 'A player'} called BANANAS!`;
     $('verify-detail').textContent = 'Check the grid below — every word should be valid and connected. The host confirms the win or calls it rotten.';
     $('host-verify').classList.toggle('hidden', !isHost);
     $('host-gameover').classList.add('hidden');
-  } else {
-    const w = state.players.find((p) => p.id === state.winnerId);
-    $('verify-title').textContent = `🎉 ${w ? w.name : 'Someone'} wins!`;
-    $('verify-detail').textContent = 'Final grid:';
-    $('host-verify').classList.add('hidden');
-    $('host-gameover').classList.toggle('hidden', !isHost);
+    single.classList.remove('hidden');
+    all.classList.add('hidden');
+    renderRevealBoard(single, r ? r.board : {});
+    return;
   }
 
-  renderRevealBoard(r ? r.board : {});
+  // Game over: show every player's final board.
+  const w = state.players.find((p) => p.id === state.winnerId);
+  $('verify-title').textContent = w ? `🎉 ${w.name} wins!` : 'Game over';
+  $('verify-detail').textContent = 'Final grids from every player:';
+  $('host-verify').classList.add('hidden');
+  $('host-gameover').classList.toggle('hidden', !isHost);
+  single.classList.add('hidden');
+  all.classList.remove('hidden');
+  renderAllBoards(state.allBoards || []);
 }
 
-function renderRevealBoard(board) {
+function renderAllBoards(boards) {
+  const el = $('reveal-all');
+  if (!boards.length) { el.innerHTML = '<p class="hint">No boards to show.</p>'; return; }
+  el.innerHTML = boards.map((b, i) => {
+    const tags = [];
+    if (b.isWinner) tags.push('<span class="tag winner">winner</span>');
+    if (b.out) tags.push('<span class="tag out">out</span>');
+    if (b.playerId === playerId) tags.push('<span class="tag you">you</span>');
+    return `
+      <div class="reveal-entry">
+        <h3 class="reveal-name"><span>${escapeHtml(b.name)}</span>${tags.join('')}</h3>
+        <div id="reveal-entry-${i}" class="board reveal"></div>
+      </div>
+    `;
+  }).join('');
+  boards.forEach((b, i) => renderRevealBoard($(`reveal-entry-${i}`), b.board));
+}
+
+function renderRevealBoard(el, board) {
   const keys = Object.keys(board);
-  const el = $('reveal-board');
   if (!keys.length) { el.innerHTML = '<span class="hint">No tiles.</span>'; return; }
   // Crop to the used bounding box so the reveal isn't a huge empty grid.
   let minR = Infinity, maxR = -Infinity, minC = Infinity, maxC = -Infinity;
