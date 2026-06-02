@@ -95,9 +95,20 @@ function stateFor(viewerId) {
   const viewer = findPlayer(viewerId);
 
   let reveal = null;
-  if ((game.phase === 'verify' || game.phase === 'gameover')) {
-    const shownId = game.phase === 'verify' ? game.bananaClaimId : game.winnerId;
-    const shown = findPlayer(shownId);
+  let allBoards = null;
+  if (game.phase === 'verify') {
+    const shown = findPlayer(game.bananaClaimId);
+    if (shown) reveal = { playerId: shown.id, name: shown.name, board: shown.board };
+  } else if (game.phase === 'gameover') {
+    // Reveal every player's final board — winners and losers alike.
+    allBoards = game.players.map((p) => ({
+      playerId: p.id,
+      name: p.name,
+      out: p.out,
+      isWinner: p.id === game.winnerId,
+      board: p.board,
+    }));
+    const shown = findPlayer(game.winnerId);
     if (shown) reveal = { playerId: shown.id, name: shown.name, board: shown.board };
   }
 
@@ -112,6 +123,7 @@ function stateFor(viewerId) {
     yourBoard: viewer && game.phase !== 'lobby' ? viewer.board : {},
     youAreOut: !!(viewer && viewer.out),
     reveal,
+    allBoards,
     players: game.players.map((p) => ({
       id: p.id,
       name: p.name,
