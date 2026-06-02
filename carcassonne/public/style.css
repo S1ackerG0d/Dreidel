@@ -121,6 +121,8 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   animation: pulse 1.4s ease-in-out infinite;
 }
 .meeple-spot:hover { fill: var(--accent); }
+.meeple-spot.farmer-spot { fill: rgba(155, 191, 111, 0.7); }
+.meeple-spot.farmer-spot:hover { fill: var(--field-dark); }
 @keyframes pulse {
   0%, 100% { transform: scale(1); transform-origin: center; }
   50% { transform: scale(1.15); transform-origin: center; }
