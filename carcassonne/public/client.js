@@ -39,9 +39,6 @@ function setConnection(online) {
   el.className = 'status ' + (online ? 'online' : 'offline');
 }
 
-// ---------------------------------------------------------------------------
-// Join
-// ---------------------------------------------------------------------------
 async function doJoin() {
   const name = $('name-input').value.trim();
   if (!name) { $('join-error').textContent = 'Please enter a name.'; return; }
@@ -55,42 +52,83 @@ async function doJoin() {
 }
 
 // ---------------------------------------------------------------------------
-// Tile geometry — must mirror the server's rotation rules
+// Tile geometry — mirrors the server's tiles.js
 // ---------------------------------------------------------------------------
-function rotatedEdges(edges, rot) {
-  return [0, 1, 2, 3].map((i) => edges[(i - rot + 4) % 4]);
-}
-
-function rotatedFeatures(features, rot) {
-  return features.map((f) => ({
-    type: f.type,
-    sides: f.sides ? f.sides.map((s) => (s + rot) % 4) : undefined,
-  }));
-}
-
-const SIDE_MID = [
-  [50, 0],   // N
-  [100, 50], // E
-  [50, 100], // S
-  [0, 50],   // W
+const NW = 0, N_MID = 1, NE = 2, W_MID = 3, CENTRE = 4, E_MID = 5, SW = 6, S_MID = 7, SE = 8;
+const SIDE_MID = [N_MID, E_MID, S_MID, W_MID];
+const ADJ = [
+  [N_MID, W_MID], [NW, NE, CENTRE], [N_MID, E_MID],
+  [NW, CENTRE, SW], [N_MID, W_MID, E_MID, S_MID], [NE, CENTRE, SE],
+  [W_MID, S_MID], [CENTRE, SW, SE], [E_MID, S_MID],
 ];
 
-function featurePos(feat) {
-  if (feat.type === 'cloister' || !feat.sides || feat.sides.length === 0) {
-    return [50, 50];
+function rotateTerrain(terrain, rot) {
+  let cur = terrain;
+  const r = ((rot % 4) + 4) % 4;
+  for (let n = 0; n < r; n++) {
+    const out = new Array(9);
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
+      out[i * 3 + j] = cur[(2 - j) * 3 + i];
+    }
+    cur = out.join('');
   }
-  let cx = 0, cy = 0;
-  for (const s of feat.sides) {
-    cx += SIDE_MID[s][0];
-    cy += SIDE_MID[s][1];
+  return cur;
+}
+
+function deriveFeatures(terrain) {
+  const owner = new Array(9).fill(-1);
+  const features = [];
+  for (let start = 0; start < 9; start++) {
+    if (owner[start] !== -1) continue;
+    const t = terrain[start];
+    const stack = [start];
+    const cells = [];
+    while (stack.length) {
+      const cur = stack.pop();
+      if (owner[cur] !== -1) continue;
+      owner[cur] = features.length;
+      cells.push(cur);
+      if (t === 'J') continue;
+      for (const n of ADJ[cur]) {
+        if (owner[n] === -1 && terrain[n] === t) stack.push(n);
+      }
+    }
+    const type = t === 'C' ? 'city' : (t === 'R' || t === 'J') ? 'road' : 'field';
+    const sides = [];
+    for (let s = 0; s < 4; s++) if (cells.includes(SIDE_MID[s])) sides.push(s);
+    features.push({ type, cells, sides, isJunction: t === 'J' });
   }
-  cx /= feat.sides.length;
-  cy /= feat.sides.length;
-  if (feat.sides.length === 1) {
-    cx = (cx + 50) / 2;
-    cy = (cy + 50) / 2;
+  return { features, owner };
+}
+
+// Pixel coordinates for grid cells (each cell = 33.333 × 33.333 of a 100×100 tile).
+function cellRect(cell) {
+  const col = cell % 3;
+  const row = Math.floor(cell / 3);
+  return { x: col * (100 / 3), y: row * (100 / 3), w: 100 / 3, h: 100 / 3 };
+}
+
+function sideMidPoint(side) {
+  const cell = SIDE_MID[side];
+  const r = cellRect(cell);
+  return { x: r.x + r.w / 2, y: r.y + r.h / 2 };
+}
+
+function cellCentre(cell) {
+  const r = cellRect(cell);
+  return { x: r.x + r.w / 2, y: r.y + r.h / 2 };
+}
+
+// Best meeple anchor for a local feature on a tile.
+function featureAnchor(feature) {
+  if (feature.type === 'cloister' || feature.cells === undefined) return { x: 50, y: 50 };
+  if (feature.cells.length === 0) return { x: 50, y: 50 };
+  let sx = 0, sy = 0;
+  for (const c of feature.cells) {
+    const p = cellCentre(c);
+    sx += p.x; sy += p.y;
   }
-  return [cx, cy];
+  return { x: sx / feature.cells.length, y: sy / feature.cells.length };
 }
 
 // ---------------------------------------------------------------------------
@@ -102,81 +140,10 @@ function el(tag, attrs = {}) {
   return e;
 }
 
-function rect(x, y, w, h, cls) {
-  return el('rect', { x, y, width: w, height: h, class: cls });
-}
-
-function line(x1, y1, x2, y2, cls) {
-  return el('line', { x1, y1, x2, y2, class: cls });
-}
-
-const CITY_WEDGE = {
-  0: 'M 0 0 L 100 0 L 72 32 L 28 32 Z',
-  1: 'M 100 0 L 100 100 L 68 72 L 68 28 Z',
-  2: 'M 100 100 L 0 100 L 28 68 L 72 68 Z',
-  3: 'M 0 100 L 0 0 L 32 28 L 32 72 Z',
-};
-
-function drawCity(parent, feat) {
-  // The four-side case fills the whole tile (a city dominates the entire square).
-  if (feat.sides.length === 4) {
-    parent.appendChild(rect(2, 2, 96, 96, 'tile-city'));
-    return;
-  }
-  // For adjacent sides we also draw a small corner block so the city looks
-  // connected to itself rather than two unrelated triangles.
-  const sset = new Set(feat.sides);
-  for (const s of feat.sides) {
-    const p = el('path', { d: CITY_WEDGE[s], class: 'tile-city' });
-    parent.appendChild(p);
-  }
-  const adjacencies = [[0, 1], [1, 2], [2, 3], [3, 0]];
-  const corners = {
-    '0,1': 'M 50 0 L 100 0 L 100 50 L 68 28 Z',
-    '1,2': 'M 100 50 L 100 100 L 50 100 L 72 68 Z',
-    '2,3': 'M 50 100 L 0 100 L 0 50 L 32 72 Z',
-    '3,0': 'M 0 50 L 0 0 L 50 0 L 28 32 Z',
-  };
-  for (const [a, b] of adjacencies) {
-    if (sset.has(a) && sset.has(b)) {
-      parent.appendChild(el('path', { d: corners[a + ',' + b], class: 'tile-city' }));
-    }
-  }
-}
-
-function drawRoad(parent, sides) {
-  // Two coats — a darker outline under the road surface.
-  for (const s of sides) {
-    const [x, y] = SIDE_MID[s];
-    parent.appendChild(line(x, y, 50, 50, 'tile-road-edge'));
-  }
-  for (const s of sides) {
-    const [x, y] = SIDE_MID[s];
-    parent.appendChild(line(x, y, 50, 50, 'tile-road'));
-  }
-  // Junction dot for crossroads / T-junctions / single-edge dead-ends.
-  if (sides.length !== 2 || Math.abs(sides[0] - sides[1]) !== 2) {
-    parent.appendChild(el('circle', {
-      cx: 50, cy: 50, r: 4.5,
-      fill: '#5a4634', stroke: '#3a2a1a', 'stroke-width': 1,
-    }));
-  }
-}
-
-function drawCloister(parent) {
-  parent.appendChild(rect(35, 38, 30, 28, 'tile-cloister'));
-  parent.appendChild(el('path', {
-    d: 'M 32 40 L 50 28 L 68 40 Z',
-    class: 'tile-cloister-roof',
-  }));
-  parent.appendChild(el('path', {
-    d: 'M 48 48 L 52 48 L 52 54 L 56 54 L 56 58 L 52 58 L 52 64 L 48 64 L 48 58 L 44 58 L 44 54 L 48 54 Z',
-    fill: '#5a3a1c',
-  }));
-}
-
-function meepleShape(cx, cy, color, scale = 1) {
-  const g = el('g', { transform: `translate(${cx} ${cy}) scale(${scale})` });
+function meepleShape(cx, cy, color, kind, scale = 0.9) {
+  // kind: 'meeple' = standing; 'farmer' = lying down (rotated 90°).
+  const rot = kind === 'farmer' ? 90 : 0;
+  const g = el('g', { transform: `translate(${cx} ${cy}) rotate(${rot}) scale(${scale})` });
   g.appendChild(el('path', {
     class: 'meeple-shape',
     fill: color,
@@ -185,74 +152,112 @@ function meepleShape(cx, cy, color, scale = 1) {
   return g;
 }
 
-// ---------------------------------------------------------------------------
-// Tile rendering
-// ---------------------------------------------------------------------------
-function renderTile(parent, tile, opts = {}) {
-  const g = el('g', {
-    transform: `translate(${tile.x * 100} ${tile.y * 100})`,
-  });
-  const isLast = opts.isLast;
-  g.appendChild(rect(0, 0, 100, 100, 'tile-bg' + (isLast ? ' last-placed' : '')));
-
-  const features = rotatedFeatures(tile.features, tile.rot);
-
-  // Cities first so roads run on top.
-  for (const f of features) if (f.type === 'city') drawCity(g, f);
-
-  // Roads.
-  for (const f of features) if (f.type === 'road') drawRoad(g, f.sides);
-
-  // Cloister.
-  for (const f of features) if (f.type === 'cloister') drawCloister(g);
-
-  // Meeples placed on this tile.
-  for (const m of (tile.meeples || [])) {
-    const p = state.players.find((pl) => pl.id === m.playerId);
-    if (!p) continue;
-    const feat = features[m.localIdx];
-    const [cx, cy] = featurePos(feat);
-    g.appendChild(meepleShape(cx, cy, p.color, 1));
-  }
-
-  parent.appendChild(g);
+function pennantShape(cx, cy) {
+  // Small triangle flag in city.
+  const g = el('g', { transform: `translate(${cx} ${cy})` });
+  g.appendChild(el('rect', { x: -0.5, y: -8, width: 1, height: 16, fill: '#3a2a1a' }));
+  g.appendChild(el('path', { d: 'M 0 -8 L 8 -5 L 0 -2 Z', fill: '#e84a4a', stroke: '#3a2a1a', 'stroke-width': 0.5 }));
+  return g;
 }
 
-// Tile preview (for the player whose turn it is) — drawn into preview-svg.
+// ---------------------------------------------------------------------------
+// Tile rendering (from terrain + cloister + pennant)
+// ---------------------------------------------------------------------------
+function renderTileInto(parent, transform, templateId, rot, opts = {}) {
+  const tpl = state.templates[templateId];
+  if (!tpl) return null;
+  const terrain = rotateTerrain(tpl.terrain, rot);
+  const derived = deriveFeatures(terrain);
+
+  const g = el('g', { transform });
+  parent.appendChild(g);
+
+  // Field background (entire tile starts as field, cities/roads paint over).
+  g.appendChild(el('rect', { x: 0, y: 0, width: 100, height: 100, class: 'tile-bg' + (opts.isLast ? ' last-placed' : '') }));
+
+  // Cities: paint each city cell as a filled rect (same colour, adjacent cells visually merge).
+  for (const f of derived.features) {
+    if (f.type !== 'city') continue;
+    for (const c of f.cells) {
+      const r = cellRect(c);
+      g.appendChild(el('rect', { x: r.x, y: r.y, width: r.w, height: r.h, class: 'tile-city' }));
+    }
+  }
+
+  // Roads: draw a stroke from each road cell's centre to each connected
+  // road cell's centre (within the tile). Each road feature's segments stay
+  // visually separate at junctions (J cells don't propagate).
+  const drawnRoadPairs = new Set();
+  for (const f of derived.features) {
+    if (f.type !== 'road') continue;
+    for (const c of f.cells) {
+      // Connect to each adjacent cell of the same feature.
+      for (const n of ADJ[c]) {
+        if (derived.owner[n] !== derived.owner[c]) continue;
+        const key = c < n ? `${c}-${n}` : `${n}-${c}`;
+        if (drawnRoadPairs.has(key)) continue;
+        drawnRoadPairs.add(key);
+        const p1 = cellCentre(c);
+        const p2 = cellCentre(n);
+        g.appendChild(el('line', { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, class: 'tile-road-edge' }));
+      }
+      // If this road cell is an edge cell, also connect it to its outer edge midpoint
+      // (so 1-side roads visually reach the tile boundary).
+      if (c === N_MID || c === E_MID || c === S_MID || c === W_MID) {
+        const cc = cellCentre(c);
+        const side = SIDE_MID.indexOf(c);
+        const outer = sideMidPoint(side); // same as cc (edge cell centre is on the boundary already...)
+        // Actually the edge-cell centre is at the boundary midpoint, so no extra line is needed.
+      }
+    }
+  }
+  // Now draw the lighter road surface over the dark outline.
+  for (const key of drawnRoadPairs) {
+    const [a, b] = key.split('-').map(Number);
+    const p1 = cellCentre(a);
+    const p2 = cellCentre(b);
+    g.appendChild(el('line', { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, class: 'tile-road' }));
+  }
+
+  // Junction dot at any J cell.
+  if (terrain[CENTRE] === 'J') {
+    const cc = cellCentre(CENTRE);
+    g.appendChild(el('circle', { cx: cc.x, cy: cc.y, r: 5, fill: '#5a4634', stroke: '#3a2a1a', 'stroke-width': 1 }));
+  }
+
+  // Cloister.
+  if (tpl.cloister) {
+    g.appendChild(el('rect', { x: 35, y: 38, width: 30, height: 28, class: 'tile-cloister' }));
+    g.appendChild(el('path', { d: 'M 32 40 L 50 28 L 68 40 Z', class: 'tile-cloister-roof' }));
+    g.appendChild(el('path', {
+      d: 'M 48 48 L 52 48 L 52 54 L 56 54 L 56 58 L 52 58 L 52 64 L 48 64 L 48 58 L 44 58 L 44 54 L 48 54 Z',
+      fill: '#5a3a1c',
+    }));
+  }
+
+  // Pennant — placed in the largest city feature's anchor.
+  if (tpl.pennants > 0) {
+    const cityFeats = derived.features.filter((f) => f.type === 'city');
+    if (cityFeats.length) {
+      cityFeats.sort((a, b) => b.cells.length - a.cells.length);
+      const anchor = featureAnchor(cityFeats[0]);
+      // Offset slightly so pennant doesn't overlap a meeple in the same spot.
+      g.appendChild(pennantShape(anchor.x - 10, anchor.y));
+    }
+  }
+
+  return { g, derived };
+}
+
+// ---------------------------------------------------------------------------
+// Tile preview
+// ---------------------------------------------------------------------------
 function renderPreview() {
   const svg = $('preview-svg');
   while (svg.firstChild) svg.removeChild(svg.firstChild);
   if (!state.currentTile) return;
-  const t = TEMPLATES[state.currentTile.templateId];
-  if (!t) return;
-  const previewTile = {
-    x: 0, y: 0, rot: state.currentTile.rot,
-    edges: t.edges, features: t.features, meeples: [],
-  };
-  renderTile(svg, previewTile, { isLast: false });
+  renderTileInto(svg, 'translate(0 0)', state.currentTile.templateId, state.currentTile.rot);
 }
-
-// Templates table — kept in sync with tiles.js on the server. The preview only
-// needs `edges` and `features` for each id; the rest is server-managed.
-const TEMPLATES = {
-  start: { edges: ['C', 'R', 'F', 'R'], features: [{ type: 'city', sides: [0] }, { type: 'road', sides: [1, 3] }] },
-  'road-straight': { edges: ['F', 'R', 'F', 'R'], features: [{ type: 'road', sides: [1, 3] }] },
-  'road-curve': { edges: ['F', 'R', 'R', 'F'], features: [{ type: 'road', sides: [1, 2] }] },
-  'road-t': { edges: ['F', 'R', 'R', 'R'], features: [{ type: 'road', sides: [1] }, { type: 'road', sides: [2] }, { type: 'road', sides: [3] }] },
-  'road-cross': { edges: ['R', 'R', 'R', 'R'], features: [{ type: 'road', sides: [0] }, { type: 'road', sides: [1] }, { type: 'road', sides: [2] }, { type: 'road', sides: [3] }] },
-  cloister: { edges: ['F', 'F', 'F', 'F'], features: [{ type: 'cloister' }] },
-  'cloister-road': { edges: ['F', 'F', 'R', 'F'], features: [{ type: 'cloister' }, { type: 'road', sides: [2] }] },
-  'city-edge': { edges: ['C', 'F', 'F', 'F'], features: [{ type: 'city', sides: [0] }] },
-  'city-edge-road-straight': { edges: ['C', 'R', 'F', 'R'], features: [{ type: 'city', sides: [0] }, { type: 'road', sides: [1, 3] }] },
-  'city-edge-road-t': { edges: ['C', 'R', 'R', 'R'], features: [{ type: 'city', sides: [0] }, { type: 'road', sides: [1] }, { type: 'road', sides: [2] }, { type: 'road', sides: [3] }] },
-  'city-edge-road-curveR': { edges: ['C', 'R', 'R', 'F'], features: [{ type: 'city', sides: [0] }, { type: 'road', sides: [1, 2] }] },
-  'city-edge-road-curveL': { edges: ['C', 'F', 'R', 'R'], features: [{ type: 'city', sides: [0] }, { type: 'road', sides: [2, 3] }] },
-  'city-adjacent': { edges: ['C', 'C', 'F', 'F'], features: [{ type: 'city', sides: [0, 1] }] },
-  'city-opposite': { edges: ['C', 'F', 'C', 'F'], features: [{ type: 'city', sides: [0] }, { type: 'city', sides: [2] }] },
-  'city-three': { edges: ['C', 'C', 'F', 'C'], features: [{ type: 'city', sides: [0, 1, 3] }] },
-  'city-full': { edges: ['C', 'C', 'C', 'C'], features: [{ type: 'city', sides: [0, 1, 2, 3] }] },
-  'city-edge-road-end': { edges: ['C', 'F', 'R', 'F'], features: [{ type: 'city', sides: [0] }, { type: 'road', sides: [2] }] },
-};
 
 // ---------------------------------------------------------------------------
 // Board rendering
@@ -261,7 +266,6 @@ function renderBoard(svg) {
   while (svg.firstChild) svg.removeChild(svg.firstChild);
   if (!state.tiles || state.tiles.length === 0) return;
 
-  // Compute bounding box (in tile coords) with 1-cell margin so legal hints fit.
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (const t of state.tiles) {
     if (t.x < minX) minX = t.x;
@@ -269,41 +273,43 @@ function renderBoard(svg) {
     if (t.x > maxX) maxX = t.x;
     if (t.y > maxY) maxY = t.y;
   }
-  // Expand by the legal placements so highlights are visible.
-  if (state.legalPlacements) {
-    for (const lp of state.legalPlacements) {
-      if (lp.x < minX) minX = lp.x;
-      if (lp.y < minY) minY = lp.y;
-      if (lp.x > maxX) maxX = lp.x;
-      if (lp.y > maxY) maxY = lp.y;
-    }
+  if (state.legalPlacements) for (const lp of state.legalPlacements) {
+    if (lp.x < minX) minX = lp.x;
+    if (lp.y < minY) minY = lp.y;
+    if (lp.x > maxX) maxX = lp.x;
+    if (lp.y > maxY) maxY = lp.y;
   }
   minX -= 1; minY -= 1; maxX += 1; maxY += 1;
-  const vbX = minX * 100;
-  const vbY = minY * 100;
-  const vbW = (maxX - minX + 1) * 100;
-  const vbH = (maxY - minY + 1) * 100;
-  svg.setAttribute('viewBox', `${vbX} ${vbY} ${vbW} ${vbH}`);
+  svg.setAttribute('viewBox', `${minX*100} ${minY*100} ${(maxX-minX+1)*100} ${(maxY-minY+1)*100}`);
 
   const myTurn = state.currentPlayerId === playerId;
   const lastKey = state.lastPlacedKey;
 
-  // Tiles.
   for (const t of state.tiles) {
     const isLast = lastKey === `${t.x},${t.y}` && state.subPhase === 'meeple';
-    renderTile(svg, t, { isLast });
+    const rendered = renderTileInto(svg, `translate(${t.x * 100} ${t.y * 100})`, t.templateId, t.rot, { isLast });
+    if (!rendered) continue;
+    // Render meeples placed on this tile.
+    for (const m of t.meeples) {
+      const player = state.players.find((pl) => pl.id === m.playerId);
+      if (!player) continue;
+      const feat = rendered.derived.features[m.localIdx];
+      // Cloister feature is appended after derived features on cloister tiles.
+      let anchor;
+      if (feat) anchor = featureAnchor(feat);
+      else anchor = { x: 50, y: 50 };
+      rendered.g.appendChild(meepleShape(anchor.x, anchor.y, player.color, m.kind || 'meeple', 0.9));
+    }
   }
 
-  // Legal placement hints — only on this player's "place" turn.
+  // Legal placements (current rotation only).
   if (myTurn && state.subPhase === 'place' && state.currentTile && state.legalPlacements) {
     const rot = state.currentTile.rot;
     for (const lp of state.legalPlacements) {
-      const valid = lp.rotations.includes(rot);
-      if (!valid) continue;
-      const cell = rect(lp.x * 100 + 4, lp.y * 100 + 4, 92, 92, 'legal-cell');
+      if (!lp.rotations.includes(rot)) continue;
+      const cell = el('rect', { x: lp.x * 100 + 4, y: lp.y * 100 + 4, width: 92, height: 92, class: 'legal-cell' });
       cell.addEventListener('click', () =>
-        action('placeTile', { x: lp.x, y: lp.y, rot }).then(showErrorIfAny),
-      );
+        action('placeTile', { x: lp.x, y: lp.y, rot }).then(showErrorIfAny));
       svg.appendChild(cell);
     }
   }
@@ -312,27 +318,35 @@ function renderBoard(svg) {
   if (myTurn && state.subPhase === 'meeple' && state.meepleSpots && state.lastPlacedKey) {
     const last = state.tiles.find((t) => `${t.x},${t.y}` === state.lastPlacedKey);
     if (last) {
-      const features = rotatedFeatures(last.features, last.rot);
+      const tpl = state.templates[last.templateId];
+      const terrain = rotateTerrain(tpl.terrain, last.rot);
+      const derived = deriveFeatures(terrain);
       for (const idx of state.meepleSpots) {
-        const [cx, cy] = featurePos(features[idx]);
+        let anchor;
+        let type;
+        if (idx < derived.features.length) {
+          const f = derived.features[idx];
+          anchor = featureAnchor(f);
+          type = f.type;
+        } else {
+          anchor = { x: 50, y: 50 };
+          type = 'cloister';
+        }
         const c = el('circle', {
-          cx: last.x * 100 + cx,
-          cy: last.y * 100 + cy,
-          r: 9,
-          class: 'meeple-spot',
+          cx: last.x * 100 + anchor.x,
+          cy: last.y * 100 + anchor.y,
+          r: type === 'field' ? 7 : 9,
+          class: 'meeple-spot ' + (type === 'field' ? 'farmer-spot' : ''),
         });
         c.addEventListener('click', () =>
-          action('placeMeeple', { localIdx: idx }).then(showErrorIfAny),
-        );
+          action('placeMeeple', { localIdx: idx }).then(showErrorIfAny));
         svg.appendChild(c);
       }
     }
   }
 }
 
-function showErrorIfAny(r) {
-  if (r && r.error) alert(r.error);
-}
+function showErrorIfAny(r) { if (r && r.error) alert(r.error); }
 
 // ---------------------------------------------------------------------------
 // Top-level render
@@ -360,16 +374,13 @@ function render() {
     playerId = null;
     if (evtSource) { evtSource.close(); evtSource = null; }
   }
-
   const showJoin = !playerId || !known;
   const playing = state && state.phase === 'play' && !showJoin;
   const over = state && state.phase === 'gameover' && !showJoin;
-
   $('join-screen').classList.toggle('hidden', !showJoin);
   $('lobby-screen').classList.toggle('hidden', !(state && state.phase === 'lobby' && !showJoin));
   $('play-screen').classList.toggle('hidden', !playing);
   $('over-screen').classList.toggle('hidden', !over);
-
   if (!state || showJoin) return;
   if (state.phase === 'lobby') renderLobby();
   else if (playing) renderPlay();
@@ -388,8 +399,7 @@ function renderLobby() {
           <span class="pname">${escapeHtml(p.name)}</span>
           ${playerTags(p)}
         </span>
-      </li>`)
-    .join('');
+      </li>`).join('');
 }
 
 function renderPlay() {
@@ -400,29 +410,24 @@ function renderPlay() {
 
   if (state.subPhase === 'place') {
     $('phase-hint').textContent = myTurn
-      ? 'Pick a glowing square to lay your tile. Rotate it until the edges line up.'
+      ? 'Tap a glowing square to lay your tile. Rotate it until the edges line up.'
       : `Waiting for ${cur ? cur.name : 'the next player'} to place a tile…`;
   } else if (state.subPhase === 'meeple') {
     $('phase-hint').textContent = myTurn
-      ? 'Optional: claim a feature on the tile you just placed by tapping a glowing spot.'
+      ? 'Optional: claim a road, city, cloister, or field by tapping a glowing spot. Field claims (farmers) lie down and only score at end of game.'
       : `Waiting for ${cur ? cur.name : 'the next player'} to choose a meeple…`;
   } else {
     $('phase-hint').textContent = '';
   }
   $('deck-info').textContent = `Tiles left: ${state.deckLeft}` + (state.discards ? ` · ${state.discards} discarded` : '');
 
-  // Preview tile (only when it is the current player's turn AND they're placing).
   const showPreview = myTurn && state.subPhase === 'place' && state.currentTile;
   $('tile-preview').classList.toggle('hidden', !showPreview);
   if (showPreview) renderPreview();
-
-  // Meeple-prompt card with skip button.
   $('meeple-prompt').classList.toggle('hidden', !(myTurn && state.subPhase === 'meeple'));
 
-  // Board.
   renderBoard($('board'));
 
-  // Scores.
   $('scoreboard').innerHTML = state.players
     .map((p) => {
       const isCur = p.id === state.currentPlayerId;
@@ -437,7 +442,6 @@ function renderPlay() {
       </li>`;
     }).join('');
 
-  // Log.
   $('log').innerHTML = state.log.slice().reverse()
     .map((l) => `<li>${escapeHtml(l.message)}</li>`).join('');
 }
@@ -453,7 +457,6 @@ function renderOver() {
     $('winner-text').textContent = 'Game over!';
   }
   $('again-btn').classList.toggle('hidden', !isHost);
-
   $('final-scoreboard').innerHTML = [...state.players]
     .sort((a, b) => b.score - a.score)
     .map((p) => `<li>
@@ -463,7 +466,6 @@ function renderOver() {
       </span>
       <span class="score">${p.score}</span>
     </li>`).join('');
-
   if ($('final-board')) renderBoard($('final-board'));
 }
 
@@ -478,6 +480,5 @@ $('rotate-ccw').addEventListener('click', () => action('rotate', { dir: 'ccw' })
 $('rotate-cw').addEventListener('click', () => action('rotate', { dir: 'cw' }).then(showErrorIfAny));
 $('skip-meeple').addEventListener('click', () => action('skipMeeple').then(showErrorIfAny));
 
-// Boot
 if (playerId) connectEvents();
 render();
