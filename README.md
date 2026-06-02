@@ -2,7 +2,7 @@
 
 Self-hosted multiplayer party games for your own Linux PC. Everyone on the same
 network joins from their phone or laptop browser — no app installs, no internet
-required, **zero dependencies**. Seven games live here:
+required, **zero dependencies**. Eight games live here:
 
 - **🕎 Dreidel** — `node server.js` (port 3000) — the full dreidel game below.
 - **🃏 Card Table** — `node cards/server.js` (port 3100) — a shared 52-card deck
@@ -27,6 +27,10 @@ required, **zero dependencies**. Seven games live here:
   a question hinting at it; the Organizer must sort everyone lowest to highest.
   Earn 3 Good Cards together before collecting 3 Bad Cards. See
   [`teq/README.md`](teq/README.md).
+- **🏰 Carcassonne** — `node carcassonne/server.js` (port 3700) — the tile-laying
+  game for 2–5 players. Draw a tile, rotate it so the edges line up, place a
+  meeple to claim a road / city / cloister, score completed features as the map
+  grows. See [`carcassonne/README.md`](carcassonne/README.md).
 
 ---
 
