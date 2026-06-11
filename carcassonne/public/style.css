@@ -40,6 +40,17 @@ html, body {
   cursor: grab;
 }
 
+/* connection status */
+.status {
+  align-self: flex-start;
+  font-size: 11px;
+  padding: 2px 10px;
+  border-radius: 10px;
+  letter-spacing: 0.5px;
+}
+.status.online { background: #2c4a2c; color: #9fd89f; }
+.status.offline { background: #4a342c; color: #e0b08a; }
+
 /* players */
 .player {
   display: flex;
@@ -64,6 +75,12 @@ html, body {
 .pname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pmeeples { font-size: 10px; letter-spacing: 1px; color: #b8c4a8; }
 .pscore { font-weight: bold; min-width: 28px; text-align: right; color: #f0d896; }
+.player.offline .pname { opacity: 0.45; }
+.tag { font-size: 11px; color: #b8c4a8; }
+.conn { font-size: 10px; }
+.conn.on { color: #7fd87f; }
+.conn.off { color: #d87f7f; }
+#error, .error-text { font-size: 13px; color: #e08a8a; min-height: 16px; }
 
 /* turn panel */
 #turn-panel {

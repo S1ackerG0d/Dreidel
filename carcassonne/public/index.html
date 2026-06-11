@@ -3,13 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Carcassonne</title>
+  <title>Carcassonne — LAN edition</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div id="app">
     <aside id="sidebar">
       <h1>Carcassonne</h1>
+      <div id="connection" class="status offline">Connecting…</div>
       <div id="players"></div>
       <div id="turn-panel">
         <div id="tile-preview-wrap">
@@ -22,26 +23,23 @@
           <button id="btn-undo" class="hidden">Undo tile</button>
         </div>
         <div id="hint"></div>
+        <div id="error"></div>
       </div>
       <div id="log"></div>
-      <button id="btn-new" class="secondary">New game</button>
+      <button id="btn-new" class="secondary hidden">Back to lobby</button>
     </aside>
     <canvas id="board"></canvas>
   </div>
 
-  <div id="setup" class="overlay">
+  <div id="join" class="overlay">
     <div class="dialog">
       <h1>Carcassonne</h1>
-      <p class="subtitle">The original 72-tile base game, farmers included.</p>
-      <label for="setup-count">Players</label>
-      <select id="setup-count">
-        <option value="2">2</option>
-        <option value="3">3</option>
-        <option value="4">4</option>
-        <option value="5">5</option>
-      </select>
-      <div id="setup-names"></div>
-      <button id="setup-start">Start game</button>
+      <p class="subtitle">The original 72-tile base game, farmers included.
+        2–5 players on the same network.</p>
+      <label for="name-input">Your name</label>
+      <input id="name-input" type="text" maxlength="16" autocomplete="off" autofocus>
+      <button id="join-btn">Join the table</button>
+      <div id="join-error" class="error-text"></div>
       <details>
         <summary>How to play</summary>
         <ul>
@@ -55,17 +53,28 @@
     </div>
   </div>
 
+  <div id="lobby" class="overlay hidden">
+    <div class="dialog">
+      <h1>Lobby</h1>
+      <p class="subtitle">Friends join at <strong id="lobby-share"></strong></p>
+      <div id="lobby-players"></div>
+      <div id="lobby-wait" class="subtitle"></div>
+      <button id="lobby-start" class="hidden">Start game</button>
+    </div>
+  </div>
+
   <div id="gameover" class="overlay hidden">
     <div class="dialog">
       <h1>Final scores</h1>
       <div id="final-standings"></div>
-      <button id="btn-again">Play again</button>
+      <div id="gameover-wait" class="subtitle"></div>
+      <button id="btn-view-board" class="secondary">View the board</button>
+      <button id="btn-again" class="hidden">Play again</button>
     </div>
   </div>
 
   <script src="tiles.js"></script>
-  <script src="engine.js"></script>
   <script src="render.js"></script>
-  <script src="ui.js"></script>
+  <script src="client.js"></script>
 </body>
 </html>
