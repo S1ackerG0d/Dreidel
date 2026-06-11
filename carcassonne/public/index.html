@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Carcassonne</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <aside id="sidebar">
+      <h1>Carcassonne</h1>
+      <div id="players"></div>
+      <div id="turn-panel">
+        <div id="tile-preview-wrap">
+          <canvas id="tile-preview" width="110" height="110"></canvas>
+          <div id="tiles-left"></div>
+        </div>
+        <div id="controls">
+          <button id="btn-rotate">Rotate (R)</button>
+          <button id="btn-skip" class="hidden">Skip meeple</button>
+          <button id="btn-undo" class="hidden">Undo tile</button>
+        </div>
+        <div id="hint"></div>
+      </div>
+      <div id="log"></div>
+      <button id="btn-new" class="secondary">New game</button>
+    </aside>
+    <canvas id="board"></canvas>
+  </div>
+
+  <div id="setup" class="overlay">
+    <div class="dialog">
+      <h1>Carcassonne</h1>
+      <p class="subtitle">The original 72-tile base game, farmers included.</p>
+      <label for="setup-count">Players</label>
+      <select id="setup-count">
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+      </select>
+      <div id="setup-names"></div>
+      <button id="setup-start">Start game</button>
+      <details>
+        <summary>How to play</summary>
+        <ul>
+          <li>On your turn, rotate (R) and place the drawn tile on a highlighted cell.</li>
+          <li>Optionally place a meeple on a road, city, cloister or field of that tile.</li>
+          <li>Completed roads score 1/tile; cities 2/tile (+2 per pennant); cloisters 9. Meeples return.</li>
+          <li>Farmers lie in fields and stay until the end: 3 points per completed city their field touches.</li>
+          <li>At game end, incomplete features score reduced points.</li>
+        </ul>
+      </details>
+    </div>
+  </div>
+
+  <div id="gameover" class="overlay hidden">
+    <div class="dialog">
+      <h1>Final scores</h1>
+      <div id="final-standings"></div>
+      <button id="btn-again">Play again</button>
+    </div>
+  </div>
+
+  <script src="tiles.js"></script>
+  <script src="engine.js"></script>
+  <script src="render.js"></script>
+  <script src="ui.js"></script>
+</body>
+</html>

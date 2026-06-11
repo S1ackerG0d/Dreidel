@@ -28,9 +28,11 @@ required, **zero dependencies**. Eight games live here:
   Earn 3 Good Cards together before collecting 3 Bad Cards. See
   [`teq/README.md`](teq/README.md).
 - **🏰 Carcassonne** — `node carcassonne/server.js` (port 3700) — the tile-laying
-  game for 2–5 players. Draw a tile, rotate it so the edges line up, place a
-  meeple to claim a road / city / cloister, score completed features as the map
-  grows. See [`carcassonne/README.md`](carcassonne/README.md).
+  game for 2–5 players with the full original 72-tile set. Draw a tile, rotate
+  it so the edges line up, place a meeple to claim a road / city / cloister —
+  or lay a farmer in a field for end-game scoring — as the map grows. Hot-seat:
+  everyone plays on one shared screen. See
+  [`carcassonne/README.md`](carcassonne/README.md).
 
 ---
 
