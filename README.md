@@ -30,8 +30,8 @@ required, **zero dependencies**. Eight games live here:
 - **🏰 Carcassonne** — `node carcassonne/server.js` (port 3700) — the tile-laying
   game for 2–5 players with the full original 72-tile set. Draw a tile, rotate
   it so the edges line up, place a meeple to claim a road / city / cloister —
-  or lay a farmer in a field for end-game scoring — as the map grows. Hot-seat:
-  everyone plays on one shared screen. See
+  or lay a farmer in a field for end-game scoring — as the map grows. Everyone
+  watches the board live from their own browser. See
   [`carcassonne/README.md`](carcassonne/README.md).
 
 ---
