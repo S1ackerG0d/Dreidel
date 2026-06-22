@@ -18,6 +18,8 @@ let showMonopoly = false;
 let showSend = false;
 let sendSel = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
 let discardSel = null;      // { wood, brick, ... }
+let showForced = false;     // 2-player "forced trade" panel
+let forcedSel = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
 
 // ---------------------------------------------------------------------------
 // Networking
@@ -79,6 +81,14 @@ function escapeHtml(s) {
 const myTurn = () => state && state.currentPlayerId === playerId;
 const me = () => state && state.players.find((p) => p.id === playerId);
 
+// A board piece's colour — owned by a real player or a neutral blocker.
+function ownerColor(id) {
+  const p = state.players.find((x) => x.id === id);
+  if (p) return p.color;
+  const n = (state.neutrals || []).find((x) => x.id === id);
+  return n ? n.color : '#888';
+}
+
 function playerTags(p) {
   const tags = [];
   if (p.id === state.hostId) tags.push('<span class="tag host">host</span>');
@@ -119,6 +129,16 @@ function renderLobby() {
   $('host-lobby').classList.toggle('hidden', !isHost);
   $('wait-host').classList.toggle('hidden', isHost);
   if (isHost) $('start-btn').disabled = state.players.length < 2;
+
+  // The official 2-player variant is only offered at an exactly-2-player table.
+  const twoPlayers = state.players.length === 2;
+  const on = !!state.useTwoPlayerVariant;
+  $('variant-toggle').classList.toggle('hidden', !twoPlayers);
+  $('variant-check').checked = on;
+  $('lobby-mode').textContent = twoPlayers && on
+    ? 'Mode: official 2-player variant (neutral players + trade tokens).'
+    : 'Mode: standard rules.';
+
   $('lobby-players').innerHTML = state.players.map((p) =>
     `<li><span class="left"><span class="swatch" style="background:${p.color}"></span>
       <span class="pname">${escapeHtml(p.name)}</span> ${playerTags(p)}</span></li>`).join('');
@@ -189,7 +209,7 @@ function renderBoard() {
   // Existing roads (and faint grid for empty edges).
   for (const e of b.edges) {
     if (e.owner) {
-      const color = state.players.find((p) => p.id === e.owner).color;
+      const color = ownerColor(e.owner);
       s += `<line x1="${e.x1}" y1="${e.y1}" x2="${e.x2}" y2="${e.y2}" class="edge-road" stroke="${color}" />`;
     } else {
       s += `<line x1="${e.x1}" y1="${e.y1}" x2="${e.x2}" y2="${e.y2}" class="edge-base" />`;
@@ -199,7 +219,7 @@ function renderBoard() {
   // Buildings.
   for (const v of b.vertices) {
     if (!v.building) continue;
-    const color = state.players.find((p) => p.id === v.owner).color;
+    const color = ownerColor(v.owner);
     if (v.building === 'city') {
       s += `<rect x="${v.x - 8}" y="${v.y - 8}" width="16" height="16" rx="3" fill="${color}" class="city" />`;
     } else {
@@ -260,7 +280,11 @@ function statusLine() {
   }
   if (state.turnPhase === 'moveRobber') return `${who} — move the robber.`;
   if (state.turnPhase === 'steal') return `${who} — choose someone to rob.`;
-  const dice = state.dice ? ` · rolled ${state.dice[0]}+${state.dice[1]}=${state.dice[0] + state.dice[1]}` : '';
+  let dice = '';
+  if (state.dice) {
+    dice = ` · rolled ${state.dice[0]}+${state.dice[1]}=${state.dice[0] + state.dice[1]}`;
+    if (state.dice2) dice += ` and ${state.dice2[0]}+${state.dice2[1]}=${state.dice2[0] + state.dice2[1]}`;
+  }
   return `${who}'s turn${dice}.`;
 }
 
@@ -298,7 +322,8 @@ function renderGame() {
 function renderScoreboard() {
   $('scoreboard').innerHTML = state.players.map((p) => {
     const cur = p.id === state.currentPlayerId ? ' current' : '';
-    const meta = `🛖${5 - p.settlementsLeft}/5 🏙️${4 - p.citiesLeft}/4 🛣️${p.longestRoad} · 🃏${p.devCount} · 🗡️${p.knightsPlayed}`;
+    const tokens = state.variant2p ? ` · 🎟️${p.tokens}` : '';
+    const meta = `🛖${5 - p.settlementsLeft}/5 🏙️${4 - p.citiesLeft}/4 🛣️${p.longestRoad} · 🃏${p.devCount} · 🗡️${p.knightsPlayed}${tokens}`;
     return `<li class="${cur}">
       <span class="left"><span class="swatch" style="background:${p.color}"></span>
         <span class="pname">${escapeHtml(p.name)}</span> ${playerTags(p)}
@@ -306,6 +331,15 @@ function renderScoreboard() {
       <span class="vp">${p.vp}</span>
     </li>`;
   }).join('');
+
+  // Neutral blockers (2-player variant only).
+  const neutrals = state.variant2p ? (state.neutrals || []) : [];
+  $('neutrals').classList.toggle('hidden', neutrals.length === 0);
+  $('neutrals').innerHTML = neutrals.map((n) =>
+    `<li><span class="left"><span class="swatch" style="background:${n.color}"></span>
+      <span class="pname">Neutral (${escapeHtml(n.colorName)})</span>
+      <span class="tag">blocker</span>
+      <span class="meta">🛖${n.settlements} 🛣️${n.roads}</span></span></li>`).join('');
 }
 
 function resChip(r, n) {
@@ -317,6 +351,8 @@ function renderHand() {
   $('hand-card').classList.toggle('hidden', !you);
   if (!you) return;
   $('your-vp').textContent = `${you.vp} VP`;
+  $('your-tokens').classList.toggle('hidden', !state.variant2p);
+  if (state.variant2p) $('your-tokens').textContent = `🎟️ ${you.tokens}`;
   $('resources').innerHTML = RES.map((r) => resChip(r, you.resources[r])).join('');
 
   // Dev cards
@@ -348,6 +384,14 @@ function renderControls() {
       const canBuy = RES.every((r) => true) && affordDev() && state.you.devDeckLeft > 0;
       html += `<button data-ctl="buyDev" ${canBuy ? '' : 'disabled'}>🃏 Buy dev card</button>`;
       html += `<button class="ghost" data-ctl="trade">💱 Trade</button>`;
+      if (state.variant2p) {
+        const cost = state.you.tokenActionCost;
+        const poor = state.you.tokens < cost;
+        html += `<button class="ghost${showForced ? ' primary' : ''}" data-ctl="forcedTrade" ${poor ? 'disabled' : ''}>🤝 Forced trade (${cost}🎟️)</button>`;
+        html += `<button class="ghost" data-ctl="tokenRobber" ${poor ? 'disabled' : ''}>🥷 Move robber (${cost}🎟️)</button>`;
+        const hasKnight = state.you.dev.some((d) => d.type === 'knight');
+        html += `<button class="ghost" data-ctl="sacrificeKnight" ${hasKnight ? '' : 'disabled'}>🗡️→🎟️ Sacrifice knight</button>`;
+      }
       html += `<button class="primary" data-ctl="endTurn">End turn ⏭️</button>`;
     }
   }
@@ -428,6 +472,26 @@ function renderPanels() {
     $('send-btn').textContent = total > 0 ? `Send ${total} card${total === 1 ? '' : 's'}` : 'Send';
   }
 
+  // Forced trade (2-player variant).
+  const forcedOpen = showForced && myTurn() && state.turnPhase === 'main' && state.variant2p;
+  $('forced-panel').classList.toggle('hidden', !forcedOpen);
+  if (forcedOpen) {
+    $('forced-cost').textContent = `${state.you.tokenActionCost}🎟️`;
+    let total = 0;
+    $('forced-controls').innerHTML = RES.map((r) => {
+      if (forcedSel[r] > state.you.resources[r]) forcedSel[r] = state.you.resources[r];
+      total += forcedSel[r];
+      return `<div class="res-chip discard-chip"><span class="ico">${ICON[r]}</span>
+        <button data-forcedd="-" data-r="${r}">−</button>
+        <span class="cnt">${forcedSel[r]}/${state.you.resources[r]}</span>
+        <button data-forcedd="+" data-r="${r}">+</button></div>`;
+    }).join('');
+    $('forced-btn').disabled = total !== 2;
+    $('forced-btn').textContent = `Give ${total}/2 & take 2 random`;
+  } else {
+    forcedSel = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
+  }
+
   // Steal targets shown in the status area as buttons.
   if (state.turnPhase === 'steal' && myTurn() && state.stealTargets) {
     const btns = state.stealTargets.map((t) =>
@@ -460,9 +524,12 @@ $('controls').addEventListener('click', (e) => {
   if (!b) return;
   const ctl = b.getAttribute('data-ctl');
   if (ctl === 'roll') act('roll');
-  else if (ctl === 'endTurn') { mode = null; showTrade = false; act('endTurn'); }
+  else if (ctl === 'endTurn') { mode = null; showTrade = false; showForced = false; act('endTurn'); }
   else if (ctl === 'buyDev') act('buyDev');
   else if (ctl === 'trade') { showTrade = !showTrade; renderPanels(); }
+  else if (ctl === 'forcedTrade') { showForced = !showForced; renderPanels(); }
+  else if (ctl === 'tokenRobber') act('tokenRobber');
+  else if (ctl === 'sacrificeKnight') act('sacrificeKnight');
   else if (ctl === 'cancel') { mode = null; renderGame(); }
   else if (ctl.startsWith('mode-')) {
     const m = ctl.slice(5);
@@ -510,6 +577,23 @@ $('discard-btn').addEventListener('click', async () => {
 $('action-hint').addEventListener('click', (e) => {
   const b = e.target.closest('[data-steal]');
   if (b) act('steal', { targetId: b.getAttribute('data-steal') });
+});
+
+$('variant-check').addEventListener('change', (e) => action('setVariant', { on: e.target.checked }));
+
+$('forced-controls').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-forcedd]');
+  if (!b) return;
+  const r = b.getAttribute('data-r');
+  const dir = b.getAttribute('data-forcedd');
+  const total = RES.reduce((n, x) => n + forcedSel[x], 0);
+  if (dir === '+' && forcedSel[r] < state.you.resources[r] && total < 2) forcedSel[r]++;
+  if (dir === '-' && forcedSel[r] > 0) forcedSel[r]--;
+  renderPanels();
+});
+$('forced-btn').addEventListener('click', async () => {
+  const r = await act('forcedTrade', { give: forcedSel });
+  if (!r.error) { forcedSel = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 }; showForced = false; renderPanels(); }
 });
 
 $('send-toggle').addEventListener('click', () => { showSend = !showSend; renderPanels(); });

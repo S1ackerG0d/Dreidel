@@ -21,6 +21,9 @@ const COLORS = [
   { color: '#3b6fd4', name: 'Blue' },
 ];
 
+// Dice-probability "pips" for each number token (used to seed neutral spots).
+const PIPS = { 2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 8: 5, 9: 4, 10: 3, 11: 2, 12: 1 };
+
 const COST = {
   road: { wood: 1, brick: 1 },
   settlement: { wood: 1, brick: 1, sheep: 1, wheat: 1 },
@@ -29,6 +32,16 @@ const COST = {
 };
 
 const WIN_VP = 10;
+
+// Official 2-player variant ("Catan for Two", from Traders & Barbarians).
+const TWO_PLAYER = {
+  startTokens: 5,       // trade tokens each player begins with
+  coastToken: 1,        // tokens for a settlement on the coast
+  desertCoastToken: 3,  // tokens for a settlement touching both desert and coast
+  knightTokens: 2,      // tokens gained by sacrificing a Knight card
+  neutralSettlements: 5,
+  neutralRoads: 15,
+};
 
 // ---------------------------------------------------------------------------
 // Game state (single shared room — one table per host)
@@ -48,14 +61,19 @@ function freshGame() {
     turnId: 0, // increments every turn; used to lock dev cards bought this turn
     turnPhase: null, // roll | main | discard | moveRobber | steal
     resumePhase: 'main', // where to return after a robber sequence
-    robberReason: null, // 'dice' | 'knight'
+    robberReason: null, // 'dice' | 'knight' | 'token'
     dice: null,
+    dice2: null, // second roll of the official 2-player "double dice" turn
     setup: null, // { order:[playerIdx...], idx, expect:'settlement'|'road', lastVertex }
     freeRoads: 0,
     playedDevThisTurn: false,
     pendingDiscards: {}, // playerId -> count still owed
     stealTargets: [], // playerIds the current player may rob
     winnerId: null,
+    // Official 2-player ("Catan for Two") variant.
+    useTwoPlayerVariant: false, // host's lobby toggle
+    variant2p: false,           // resolved at game start (needs exactly 2 players)
+    neutrals: [],               // imaginary blocking players: { id, color, colorName, vertices, settlementsLeft, roadsLeft }
   };
 }
 
@@ -72,6 +90,18 @@ function findPlayer(id) {
 
 function currentPlayer() {
   return game.players[game.turnIndex] || null;
+}
+
+function findNeutral(id) {
+  return game.neutrals.find((n) => n.id === id);
+}
+
+// Any board piece owner — a real player or a neutral blocker.
+function ownerColor(id) {
+  const p = findPlayer(id);
+  if (p) return p.color;
+  const n = findNeutral(id);
+  return n ? n.color : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -265,6 +295,10 @@ function startGame() {
   game.winnerId = null;
   game.log = [];
 
+  // The official "Catan for Two" rules only apply to a 2-player table.
+  game.variant2p = game.useTwoPlayerVariant && game.players.length === 2;
+  game.neutrals = [];
+
   game.players.forEach((p, i) => {
     p.resources = emptyHand();
     p.dev = [];
@@ -274,7 +308,10 @@ function startGame() {
     p.roadsLeft = 15;
     p.vertices = [];
     p.longestRoad = 0;
+    p.tokens = game.variant2p ? TWO_PLAYER.startTokens : 0;
   });
+
+  if (game.variant2p) setupNeutralPlayers();
 
   // Snake draft: forward through the seating order, then back again.
   const n = game.players.length;
@@ -309,6 +346,120 @@ function setupAdvance() {
 }
 
 // ---------------------------------------------------------------------------
+// Official 2-player variant ("Catan for Two")
+//
+// Two imaginary "neutral" players block the board: they own settlements and
+// roads (so they constrain building and can cut a longest road) but never
+// produce, trade or score. They each start with one settlement and gain one
+// more piece every time a real player expands. Real players also collect
+// trade tokens, which buy the special actions below.
+// ---------------------------------------------------------------------------
+function vertexPipValue(vid) {
+  let v = 0;
+  for (const hid of TOPO.vertexById[vid].hexes) {
+    const num = game.board.hexes[hid].number;
+    if (num != null) v += PIPS[num] || 0;
+  }
+  return v;
+}
+
+function bestOpenVertex() {
+  let best = null;
+  let bestVal = -1;
+  for (const v of TOPO.vertices) {
+    const vb = game.board.vertices[v.id];
+    if (vb.owner || vertexHasNeighbourBuilding(v.id)) continue;
+    const val = vertexPipValue(v.id);
+    if (val > bestVal) { bestVal = val; best = v.id; }
+  }
+  return best;
+}
+
+function placeNeutralSettlement(n, vid) {
+  const vb = game.board.vertices[vid];
+  vb.owner = n.id;
+  vb.building = 'settlement';
+  n.vertices.push(vid);
+  n.settlementsLeft -= 1;
+}
+
+function setupNeutralPlayers() {
+  const palette = COLORS.slice(game.players.length); // the two unused colours
+  game.neutrals = palette.slice(0, 2).map((c, i) => ({
+    id: 'neutral' + (i + 1),
+    color: c.color,
+    colorName: c.name,
+    vertices: [],
+    settlementsLeft: TWO_PLAYER.neutralSettlements,
+    roadsLeft: TWO_PLAYER.neutralRoads,
+  }));
+  for (const n of game.neutrals) {
+    const spot = bestOpenVertex();
+    if (spot == null) break;
+    placeNeutralSettlement(n, spot);
+  }
+  addLog('Two neutral players block the board (official 2-player rules).');
+}
+
+function neutralBuildRoad(n) {
+  if (n.roadsLeft <= 0) return null;
+  const cands = [];
+  for (const e of TOPO.edges) if (legalRoad(e.id, n.id)) cands.push(e.id);
+  if (!cands.length) return null;
+  const eid = cands[crypto.randomInt(0, cands.length)];
+  game.board.edges[eid].owner = n.id;
+  n.roadsLeft -= 1;
+  return 'road';
+}
+
+function neutralBuildSettlement(n) {
+  if (n.settlementsLeft <= 0) return null;
+  const cands = [];
+  for (const v of TOPO.vertices) {
+    const vb = game.board.vertices[v.id];
+    if (vb.owner || vertexHasNeighbourBuilding(v.id)) continue;
+    if (vertexTouchesPlayerRoad(v.id, n.id)) cands.push(v.id);
+  }
+  if (!cands.length) return null;
+  placeNeutralSettlement(n, cands[crypto.randomInt(0, cands.length)]);
+  return 'settlement';
+}
+
+// Whenever a real player expands, each neutral player expands by one piece of
+// the same kind (falling back to a road if no settlement spot is reachable).
+function expandNeutrals(kind) {
+  if (!game.variant2p) return;
+  const built = [];
+  for (const n of game.neutrals) {
+    let placed = kind === 'settlement' ? neutralBuildSettlement(n) : null;
+    if (!placed) placed = neutralBuildRoad(n);
+    if (placed) built.push(placed);
+  }
+  if (built.length) {
+    const counts = built.reduce((m, k) => { m[k] = (m[k] || 0) + 1; return m; }, {});
+    const parts = Object.entries(counts).map(([k, c]) => `${c} ${k}${c > 1 ? 's' : ''}`);
+    addLog('Neutral players expanded: ' + parts.join(', ') + '.');
+  }
+}
+
+// A coastal settlement earns trade tokens (more if it also touches the desert).
+function awardSettlementTokens(p, vid) {
+  if (!game.variant2p) return;
+  const hexes = TOPO.vertexById[vid].hexes;
+  if (hexes.length >= 3) return; // inland — touches three hexes, not the coast
+  const touchesDesert = hexes.some((hid) => game.board.hexes[hid].resource === 'desert');
+  const gain = touchesDesert ? TWO_PLAYER.desertCoastToken : TWO_PLAYER.coastToken;
+  p.tokens += gain;
+  addLog(`${p.name} earned ${gain} trade token${gain > 1 ? 's' : ''} (coastal settlement).`);
+}
+
+// Actions cost 1 token while you trail or are tied, 2 tokens while you lead.
+function tokenActionCost(p) {
+  const opp = game.players.find((q) => q.id !== p.id);
+  return opp && totalVP(p) > totalVP(opp) ? 2 : 1;
+}
+
+// ---------------------------------------------------------------------------
 // Dice & production
 // ---------------------------------------------------------------------------
 function produce(sum) {
@@ -318,7 +469,7 @@ function produce(sum) {
     if (h.number !== sum || game.board.robber === hex.id) continue;
     for (const vid of hex.corners) {
       const vb = game.board.vertices[vid];
-      if (!vb.owner) continue;
+      if (!vb.owner || !findPlayer(vb.owner)) continue; // neutral blockers never produce
       const amt = vb.building === 'city' ? 2 : 1;
       gains[vb.owner] = gains[vb.owner] || emptyHand();
       gains[vb.owner][h.resource] += amt;
@@ -370,16 +521,28 @@ function beginRobberSequence(reason) {
 function rollDice(playerId) {
   if (game.turnPhase !== 'roll') return { error: 'You cannot roll right now.' };
   if (currentPlayer().id !== playerId) return { error: 'It is not your turn.' };
-  const d1 = crypto.randomInt(1, 7);
-  const d2 = crypto.randomInt(1, 7);
-  game.dice = [d1, d2];
-  const sum = d1 + d2;
-  addLog(`${currentPlayer().name} rolled ${d1} + ${d2} = ${sum}.`);
-  if (sum === 7) {
+  const rollPair = () => [crypto.randomInt(1, 7), crypto.randomInt(1, 7)];
+  const name = currentPlayer().name;
+  game.dice = rollPair();
+  game.dice2 = null;
+  const sums = [game.dice[0] + game.dice[1]];
+
+  if (game.variant2p) {
+    // The 2-player variant rolls twice per turn; the two sums must differ.
+    let second;
+    do { second = rollPair(); } while (second[0] + second[1] === sums[0]);
+    game.dice2 = second;
+    sums.push(second[0] + second[1]);
+    addLog(`${name} rolled ${game.dice[0]}+${game.dice[1]}=${sums[0]} and ${second[0]}+${second[1]}=${sums[1]}.`);
+  } else {
+    addLog(`${name} rolled ${game.dice[0]} + ${game.dice[1]} = ${sums[0]}.`);
+  }
+
+  for (const s of sums) if (s !== 7) produce(s);
+  if (sums.includes(7)) {
     game.resumePhase = 'main';
     beginRobberSequence('dice');
   } else {
-    produce(sum);
     game.turnPhase = 'main';
   }
   return {};
@@ -423,7 +586,8 @@ function moveRobber(playerId, hexId) {
   const victims = new Set();
   for (const vid of TOPO.hexById[hexId].corners) {
     const vb = game.board.vertices[vid];
-    if (vb.owner && vb.owner !== playerId && handTotal(findPlayer(vb.owner)) > 0) victims.add(vb.owner);
+    const occupant = vb.owner && findPlayer(vb.owner); // skip neutral blockers
+    if (occupant && vb.owner !== playerId && handTotal(occupant) > 0) victims.add(vb.owner);
   }
   game.stealTargets = [...victims];
   if (game.stealTargets.length === 0) {
@@ -495,6 +659,7 @@ function buildRoad(playerId, eid) {
     setupAdvance();
   } else {
     addLog(`${p.name} built a road.`);
+    expandNeutrals('road');
     updateLongestRoad();
     maybeWin(p);
   }
@@ -525,6 +690,7 @@ function buildSettlement(playerId, vid) {
   vb.building = 'settlement';
   p.settlementsLeft -= 1;
   p.vertices.push(vid);
+  awardSettlementTokens(p, vid); // 2-player variant: coastal settlements earn tokens
 
   if (game.phase === 'setup') {
     addLog(`${p.name} placed a settlement.`);
@@ -545,7 +711,8 @@ function buildSettlement(playerId, vid) {
     game.setup.lastVertex = vid;
   } else {
     addLog(`${p.name} built a settlement.`);
-    updateLongestRoad(); // a new settlement can cut an opponent's road
+    expandNeutrals('settlement');
+    updateLongestRoad(); // a new settlement (yours or a neutral's) can cut a road
     maybeWin(p);
   }
   return {};
@@ -701,6 +868,77 @@ function sendResources(fromId, toId, gift) {
 }
 
 // ---------------------------------------------------------------------------
+// 2-player variant: trade-token actions
+// ---------------------------------------------------------------------------
+function sacrificeKnight(playerId) {
+  if (!game.variant2p) return { error: 'Trade tokens are only used in the 2-player variant.' };
+  if (game.turnPhase !== 'main') return { error: 'You can only do that during your build phase.' };
+  const p = findPlayer(playerId);
+  if (currentPlayer().id !== playerId) return { error: 'It is not your turn.' };
+  const card = p.dev.find((d) => d.type === 'knight' && d.boughtTurn !== game.turnId);
+  if (!card) return { error: 'You have no Knight card to sacrifice.' };
+  removeCard(p, card);
+  p.tokens += TWO_PLAYER.knightTokens;
+  addLog(`${p.name} sacrificed a Knight for ${TWO_PLAYER.knightTokens} trade tokens.`);
+  return {};
+}
+
+// "Forced Trade": pay tokens to take 2 random cards from your opponent and give
+// them 2 cards of your choice in return.
+function forcedTrade(playerId, give) {
+  if (!game.variant2p) return { error: 'Forced Trade is only available in the 2-player variant.' };
+  if (game.turnPhase !== 'main') return { error: 'You can only trade on your turn.' };
+  const p = findPlayer(playerId);
+  if (currentPlayer().id !== playerId) return { error: 'It is not your turn.' };
+  const opp = game.players.find((q) => q.id !== playerId);
+  if (!opp) return { error: 'There is no opponent to trade with.' };
+
+  const g = emptyHand();
+  let total = 0;
+  for (const r of RESOURCES) {
+    const n = Math.max(0, Math.floor(Number(give && give[r]) || 0));
+    g[r] = n;
+    total += n;
+  }
+  if (total !== 2) return { error: 'Choose exactly 2 of your resource cards to give.' };
+  for (const r of RESOURCES) if (g[r] > p.resources[r]) return { error: 'You do not have those cards.' };
+  if (handTotal(opp) === 0) return { error: 'Your opponent has no cards to take.' };
+
+  const cost = tokenActionCost(p);
+  if (p.tokens < cost) return { error: `Forced Trade costs ${cost} trade token${cost > 1 ? 's' : ''}; you have ${p.tokens}.` };
+  p.tokens -= cost;
+
+  // Take 2 random cards first (so the cards you give can't be drawn back).
+  const take = Math.min(2, handTotal(opp));
+  for (let i = 0; i < take; i++) {
+    const pool = [];
+    for (const r of RESOURCES) for (let k = 0; k < opp.resources[r]; k++) pool.push(r);
+    const r = pool[crypto.randomInt(0, pool.length)];
+    opp.resources[r] -= 1;
+    p.resources[r] += 1;
+  }
+  for (const r of RESOURCES) { p.resources[r] -= g[r]; opp.resources[r] += g[r]; }
+  addLog(`${p.name} forced a trade with ${opp.name} (paid ${cost} token${cost > 1 ? 's' : ''}).`);
+  return {};
+}
+
+// Pay tokens to move the robber (and steal) without having rolled a 7.
+function tokenRobber(playerId) {
+  if (!game.variant2p) return { error: 'That action is only available in the 2-player variant.' };
+  if (game.turnPhase !== 'main') return { error: 'You can only do that during your build phase.' };
+  const p = findPlayer(playerId);
+  if (currentPlayer().id !== playerId) return { error: 'It is not your turn.' };
+  const cost = tokenActionCost(p);
+  if (p.tokens < cost) return { error: `Moving the robber costs ${cost} trade token${cost > 1 ? 's' : ''}; you have ${p.tokens}.` };
+  p.tokens -= cost;
+  addLog(`${p.name} paid ${cost} trade token${cost > 1 ? 's' : ''} to move the robber.`);
+  game.resumePhase = 'main';
+  game.robberReason = 'token';
+  game.turnPhase = 'moveRobber';
+  return {};
+}
+
+// ---------------------------------------------------------------------------
 // End of turn
 // ---------------------------------------------------------------------------
 function endTurn(playerId) {
@@ -711,6 +949,7 @@ function endTurn(playerId) {
   game.turnId += 1;
   game.turnPhase = 'roll';
   game.dice = null;
+  game.dice2 = null;
   game.playedDevThisTurn = false;
   addLog(`${currentPlayer().name}'s turn.`);
   return {};
@@ -815,9 +1054,11 @@ function stateFor(playerId) {
       settlementsLeft: p.settlementsLeft,
       citiesLeft: p.citiesLeft,
       roadsLeft: p.roadsLeft,
+      tokens: p.tokens || 0,
       hasLongestRoad: game.longestRoadHolder === p.id,
       hasLargestArmy: game.largestArmyHolder === p.id,
     })),
+    useTwoPlayerVariant: game.useTwoPlayerVariant,
   };
 
   if (game.phase === 'lobby') return base;
@@ -831,6 +1072,13 @@ function stateFor(playerId) {
   base.freeRoads = game.freeRoads;
   base.longestRoadHolder = game.longestRoadHolder || null;
   base.largestArmyHolder = game.largestArmyHolder || null;
+  base.variant2p = game.variant2p;
+  base.dice2 = game.dice2;
+  base.neutrals = game.neutrals.map((n) => ({
+    id: n.id, color: n.color, colorName: n.colorName,
+    settlements: n.vertices.length,
+    roads: TWO_PLAYER.neutralRoads - n.roadsLeft,
+  }));
 
   if (game.phase === 'setup') {
     base.setup = { expect: game.setup.expect, round: game.setup.round };
@@ -857,6 +1105,8 @@ function stateFor(playerId) {
           (d.type === 'knight' ? ['roll', 'main'].includes(game.turnPhase) : game.turnPhase === 'main'),
       })),
       devDeckLeft: game.devDeck.length,
+      tokens: me.tokens || 0,
+      tokenActionCost: game.variant2p ? tokenActionCost(me) : 0,
     };
     base.legal = legalFor(playerId);
   }
@@ -907,10 +1157,20 @@ function handleAction(body) {
     case 'newGame':
       if (!requireHost()) return { status: 403, json: { error: 'Only the host can start a new game.' } };
       { const keep = game.players.map((p) => ({ id: p.id, name: p.name, color: p.color, colorName: p.colorName, connected: p.connected }));
+        const variant = game.useTwoPlayerVariant;
         game = freshGame();
         game.players = keep;
+        game.useTwoPlayerVariant = variant;
         game.hostId = keep[0] ? keep[0].id : null;
         addLog('Returned to the lobby.'); }
+      break;
+    case 'setVariant':
+      if (!requireHost()) return { status: 403, json: { error: 'Only the host can change the game mode.' } };
+      if (game.phase !== 'lobby') return { status: 400, json: { error: 'You can only change the mode in the lobby.' } };
+      game.useTwoPlayerVariant = !!body.on;
+      addLog(game.useTwoPlayerVariant
+        ? 'Host enabled the official 2-player variant.'
+        : 'Host disabled the 2-player variant.');
       break;
     case 'placeSettlement': result = buildSettlement(playerId, body.vertexId); break;
     case 'placeRoad': result = buildRoad(playerId, body.edgeId); break;
@@ -925,6 +1185,9 @@ function handleAction(body) {
     case 'playDev': result = playDev(playerId, body); break;
     case 'bankTrade': result = bankTrade(playerId, body.give, body.receive); break;
     case 'sendResources': result = sendResources(playerId, body.toId, body.gift); break;
+    case 'forcedTrade': result = forcedTrade(playerId, body.give); break;
+    case 'sacrificeKnight': result = sacrificeKnight(playerId); break;
+    case 'tokenRobber': result = tokenRobber(playerId); break;
     case 'endTurn': result = endTurn(playerId); break;
     case 'leave': {
       if (game.phase === 'lobby') {
