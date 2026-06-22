@@ -152,18 +152,28 @@ function enemyBoard(opp) {
   for (const ship of opp.fleet) {
     if (ship.sunk) for (const cell of ship.cells) grid[cell.r][cell.c] = 'sunk';
   }
+  // Once the battle is over, lift the fog entirely — show every remaining ship.
+  if (game.phase === 'gameover') {
+    for (const ship of opp.fleet) {
+      for (const cell of ship.cells) {
+        if (grid[cell.r][cell.c] === 'unknown') grid[cell.r][cell.c] = 'ship';
+      }
+    }
+  }
   return grid;
 }
 
 function fleetStatus(player, hideLayout) {
   // For your own fleet hideLayout=false (show everything). For the enemy fleet
-  // hideLayout=true: only reveal a ship's hit count when it is fully sunk.
+  // hideLayout=true: only reveal a ship's hit count when it is fully sunk —
+  // unless the battle is over, when everything is laid bare.
+  const reveal = !hideLayout || game.phase === 'gameover';
   return player.fleet
     .map((s) => ({
       name: s.name,
       size: s.size,
       sunk: s.sunk,
-      hits: hideLayout ? (s.sunk ? s.size : null) : s.hits,
+      hits: reveal ? s.hits : s.sunk ? s.size : null,
     }))
     // Keep a stable, canonical order regardless of placement order.
     .sort((a, b) => SHIPS.findIndex((s) => s.name === a.name) - SHIPS.findIndex((s) => s.name === b.name));
