@@ -20,7 +20,8 @@ required, **zero dependencies**. Nine games live here:
 - **🎲 Settlers** — `node catan/server.js` (port 3500) — Settlers of Catan (core
   base game) for 2–4 players: a clickable hex board, dice and resources, roads /
   settlements / cities, the robber, development cards, harbours, and longest
-  road / largest army. First to 10 points wins. See
+  road / largest army. First to 10 points wins. Includes the official **"Catan
+  for Two"** 2-player variant (neutral blockers, double dice, trade tokens). See
   [`catan/README.md`](catan/README.md).
 - **📈 That Escalated Quickly** — `node teq/server.js` (port 3600) — cooperative
   party game for 3–10 players. Each player holds a secret number 1–10 and answers

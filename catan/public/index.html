@@ -29,9 +29,14 @@
       <h2>Lobby</h2>
       <ul id="lobby-players" class="player-list"></ul>
       <div id="host-lobby" class="hidden">
+        <label id="variant-toggle" class="variant-toggle hidden">
+          <input type="checkbox" id="variant-check" />
+          Official 2-player variant — neutral players block the board, double dice rolls, and trade tokens.
+        </label>
         <button id="start-btn">Start game</button>
         <p class="hint">Snake-draft setup: each player places two settlements and two roads.</p>
       </div>
+      <p id="lobby-mode" class="hint"></p>
       <p id="wait-host" class="hint hidden">Waiting for the host to start…</p>
     </section>
 
@@ -49,10 +54,12 @@
       <div class="card">
         <h2>Players</h2>
         <ul id="scoreboard" class="player-list"></ul>
+        <ul id="neutrals" class="player-list neutral-list hidden"></ul>
       </div>
 
       <div id="hand-card" class="card hidden">
-        <h2>Your hand <span id="your-vp" class="vp-pill"></span></h2>
+        <h2>Your hand <span id="your-vp" class="vp-pill"></span>
+          <span id="your-tokens" class="vp-pill token-pill hidden"></span></h2>
         <div id="resources" class="resources"></div>
         <div id="dev-cards" class="dev-cards"></div>
 
@@ -99,6 +106,13 @@
             <select id="monopoly-res"></select>
             <button id="monopoly-btn">Steal all</button>
           </div>
+        </div>
+
+        <div id="forced-panel" class="panel hidden">
+          <h3>Forced trade <span id="forced-cost" class="vp-pill"></span></h3>
+          <p class="hint">Take 2 random cards from your opponent and give 2 cards of your choice in return.</p>
+          <div id="forced-controls" class="resources"></div>
+          <button id="forced-btn">Force trade</button>
         </div>
       </div>
 

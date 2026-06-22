@@ -71,6 +71,33 @@ Share the **LAN address** with players on the same Wi-Fi. Change the port with
 - **First to 10 victory points on their own turn wins.** Hidden VP cards count
   and are revealed at the win.
 
+### Official 2-player variant ("Catan for Two")
+
+With **exactly two** players in the lobby, the host can tick **"Official
+2-player variant"** before starting. It adapts the table the way the official
+*Traders & Barbarians* "Catan for Two" rules do, so two players get a full game
+instead of a half-empty board:
+
+- **Neutral players.** The two unused colours become imaginary blockers. Each
+  starts with one settlement and gains one more piece — a road, or a settlement
+  when its road network can reach a free corner — every time *you* build a road
+  or settlement. They never produce, trade or score, but their pieces block
+  building and can cut a longest road, keeping the map tight.
+- **Double dice.** On your turn you roll **twice**, and the two totals are
+  forced to differ — so each turn pays out on two different numbers.
+- **Trade tokens.** Each player starts with **5**. Build a settlement on the
+  **coast** for **+1**, or on a corner touching **both the desert and the
+  coast** for **+3** (during setup too). You can also **sacrifice a Knight**
+  card for **+2**.
+- **Token actions.** Spend tokens on your turn for **🤝 Forced trade** (take two
+  random cards from your opponent and give two of your choice back) or **🥷 Move
+  robber** (move the robber and steal without rolling a 7). An action costs **1
+  token while you trail or are tied**, **2 tokens while you lead**.
+
+The Knight-sacrifice reward and the exact corners/edges neutral pieces grow into
+are our own sensible reading of the variant — neutral expansion is chosen
+automatically rather than placed by hand.
+
 ## How it works
 
 - Pure Node.js built-ins: an `http` server, Server-Sent Events for live state
