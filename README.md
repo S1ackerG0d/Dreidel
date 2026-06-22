@@ -2,7 +2,7 @@
 
 Self-hosted multiplayer party games for your own Linux PC. Everyone on the same
 network joins from their phone or laptop browser — no app installs, no internet
-required, **zero dependencies**. Eight games live here:
+required, **zero dependencies**. Nine games live here:
 
 - **🕎 Dreidel** — `node server.js` (port 3000) — the full dreidel game below.
 - **🃏 Card Table** — `node cards/server.js` (port 3100) — a shared 52-card deck
@@ -33,6 +33,10 @@ required, **zero dependencies**. Eight games live here:
   or lay a farmer in a field for end-game scoring — as the map grows. Everyone
   watches the board live from their own browser. See
   [`carcassonne/README.md`](carcassonne/README.md).
+- **🚢 Battleship** — `node battleship/server.js` (port 3800) — the classic
+  two-player naval duel. Each admiral secretly places a five-ship fleet on a
+  hidden 10×10 grid, then you take turns calling shots; ships are revealed only
+  when sunk. See [`battleship/README.md`](battleship/README.md).
 
 ---
 
