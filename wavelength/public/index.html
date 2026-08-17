@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wavelength — LAN</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>🎯 Wavelength</h1>
+      <p id="connection" class="status">Connecting…</p>
+    </header>
+
+    <!-- Join -->
+    <section id="join-screen" class="card hidden">
+      <h2>Join the game</h2>
+      <div class="field">
+        <input id="name-input" type="text" placeholder="Your name" maxlength="20" autocomplete="off" />
+        <button id="join-btn">Join</button>
+      </div>
+      <p id="join-error" class="error"></p>
+    </section>
+
+    <!-- Lobby -->
+    <section id="lobby-screen" class="card hidden">
+      <h2>Lobby</h2>
+      <div id="host-lobby" class="hidden">
+        <div class="field">
+          <label for="cycles-input">Everyone is the psychic</label>
+          <input id="cycles-input" type="number" min="1" max="5" value="2" />
+          <label>time(s)</label>
+        </div>
+        <button id="start-btn">Start game</button>
+        <p class="hint">Need at least 2 players — 4+ is the sweet spot. Since there are no
+          hint cards, the psychic makes up their own spectrum each round.</p>
+      </div>
+      <p id="wait-host" class="hint hidden">Waiting for the host to start…</p>
+      <ul id="lobby-players" class="player-list"></ul>
+    </section>
+
+    <!-- Playing -->
+    <section id="play-screen" class="hidden">
+      <div class="card status-card">
+        <div id="round-label" class="round-label"></div>
+        <p id="phase-hint" class="hint"></p>
+      </div>
+
+      <div class="card wheel-card">
+        <svg id="wheel" viewBox="0 0 420 258">
+          <path class="wheel-bg" d="M 15 215 A 195 195 0 0 1 405 215 Z" />
+          <g id="bands"></g>
+          <g id="ticks"></g>
+          <path class="wheel-rim" d="M 15 215 A 195 195 0 0 1 405 215" />
+          <line class="wheel-base" x1="15" y1="215" x2="405" y2="215" />
+          <g id="result-needles"></g>
+          <line id="my-needle" x1="210" y1="215" x2="210" y2="28" class="hidden" />
+          <circle class="hub" cx="210" cy="215" r="10" />
+          <text id="left-label" class="spectrum-label" x="15" y="245" text-anchor="start"></text>
+          <text id="right-label" class="spectrum-label" x="405" y="245" text-anchor="end"></text>
+        </svg>
+
+        <!-- Psychic: give the clue -->
+        <div id="psychic-clue" class="controls hidden">
+          <p class="hint">Only <strong>you</strong> can see the target. Make up a spectrum,
+            optionally type its two ends below, then say your clue <em>out loud</em>.</p>
+          <div class="field">
+            <input id="left-input" type="text" placeholder="Left end (e.g. Cold)" maxlength="30" autocomplete="off" />
+            <input id="right-input" type="text" placeholder="Right end (e.g. Hot)" maxlength="30" autocomplete="off" />
+          </div>
+          <button id="clue-btn">I've given my clue — open guessing</button>
+        </div>
+
+        <!-- Guesser: waiting for the clue -->
+        <div id="wait-clue" class="controls hidden">
+          <p class="hint">Waiting for the psychic to give a clue…</p>
+        </div>
+
+        <!-- Guesser: dial controls -->
+        <div id="guess-controls" class="controls hidden">
+          <p class="hint">Drag the needle (or use the slider) to where the clue sits
+            on the spectrum, then lock in.</p>
+          <input id="dial-slider" type="range" min="0" max="180" step="0.5" value="90" />
+          <button id="lock-btn">Lock in guess</button>
+        </div>
+
+        <!-- Psychic: while others guess -->
+        <div id="psychic-wait" class="controls hidden">
+          <p class="hint">Dials are up — no more talking! Waiting for guesses…</p>
+          <button id="reveal-btn" class="secondary">Reveal now</button>
+        </div>
+
+        <!-- Reveal -->
+        <div id="reveal-panel" class="controls hidden">
+          <ul id="result-list" class="result-list"></ul>
+          <button id="next-btn" class="hidden">Next round</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Scoreboard</h2>
+        <ul id="scoreboard" class="player-list"></ul>
+      </div>
+
+      <div class="card">
+        <h2>Log</h2>
+        <ul id="log" class="log"></ul>
+      </div>
+    </section>
+
+    <!-- Game over -->
+    <section id="over-screen" class="hidden">
+      <div class="card over-card">
+        <h2 id="winner-text"></h2>
+        <button id="again-btn" class="hidden">Back to lobby</button>
+      </div>
+      <div class="card">
+        <h2>Final scores</h2>
+        <ul id="final-scoreboard" class="player-list"></ul>
+      </div>
+    </section>
+  </div>
+  <script src="/client.js"></script>
+</body>
+</html>

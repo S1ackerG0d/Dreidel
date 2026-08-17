@@ -2,7 +2,7 @@
 
 Self-hosted multiplayer party games for your own Linux PC. Everyone on the same
 network joins from their phone or laptop browser — no app installs, no internet
-required, **zero dependencies**. Nine games live here:
+required, **zero dependencies**. Ten games live here:
 
 - **🕎 Dreidel** — `node server.js` (port 3000) — the full dreidel game below.
 - **🃏 Card Table** — `node cards/server.js` (port 3100) — a shared 52-card deck
@@ -37,6 +37,11 @@ required, **zero dependencies**. Nine games live here:
   two-player naval duel. Each admiral secretly places a five-ship fleet on a
   hidden 10×10 grid, then you take turns calling shots; ships are revealed only
   when sunk. See [`battleship/README.md`](battleship/README.md).
+- **🎯 Wavelength** — `node wavelength/server.js` (port 3900) — the telepathic
+  party game, wheel only (no hint-card deck). Each round a rotating psychic
+  secretly sees the target, invents a spectrum, and gives a verbal clue;
+  everyone else turns a dial on their own screen to guess where it lands.
+  See [`wavelength/README.md`](wavelength/README.md).
 
 ---
 
